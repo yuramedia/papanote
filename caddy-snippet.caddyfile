@@ -1,0 +1,28 @@
+# Site block khusus papanote (menggantikan auto-generation dari app.yml).
+# Alasan: CSP default yura-infra tidak mengizinkan REST/Auth Supabase (https://*.supabase.co).
+# Ganti domain di bawah jika berbeda dari app.yml.
+papan.yuramedia.com {
+	reverse_proxy {$PAPANOTE_CONTAINER}:3000 {
+		health_uri /api/health
+		health_interval 10s
+	}
+
+	import production_base_headers
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self'; manifest-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self';"
+	}
+
+	# Service worker harus selalu segar agar update notifikasi langsung berlaku
+	@sw path /sw.js
+	header @sw Cache-Control "no-cache"
+
+	encode zstd gzip
+
+	log {
+		output file /var/log/caddy/papanote.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+		format json
+	}
+}

@@ -1,0 +1,32 @@
+-- =====================================================================
+-- papanote — Database Webhooks (Supabase → server internal)
+-- 1. Ganti __APP_URL__ dengan domain produksi (wajib HTTPS), contoh:
+--      https://papan.yuramedia.com
+-- 2. Ganti __WEBHOOK_SECRET__ dengan nilai WEBHOOK_SECRET di .env.production
+-- 3. Jalankan di SQL Editor SETELAH migrasi 001–003.
+--
+-- Catatan: hanya INSERT & UPDATE yang dikirim. DELETE sengaja TIDAK dikirim
+-- supaya purge cache Supabase tidak ikut menghapus data di Postgres internal.
+-- Webhook bersifat fire-and-forget; job rekonsiliasi di server menutup celah
+-- jika server sempat tidak bisa dihubungi.
+-- =====================================================================
+
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['boards', 'lists', 'cards', 'card_histories'] LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS papanote_sync_%1$s ON %1$I', t);
+    EXECUTE format($f$
+      CREATE TRIGGER papanote_sync_%1$s
+      AFTER INSERT OR UPDATE ON %1$I
+      FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request(
+        '__APP_URL__/api/webhook/supabase',
+        'POST',
+        '{"Content-Type":"application/json","x-webhook-secret":"__WEBHOOK_SECRET__"}',
+        '{}',
+        '5000'
+      )$f$, t);
+  END LOOP;
+END $$;

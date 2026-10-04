@@ -1,0 +1,170 @@
+name: CI/CD Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: papanote-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: yuramedia/papanote
+  APP_DIR: /root/yura-infra/apps/papanote
+  DEPLOY_HOST: 209.209.8.178
+  DEPLOY_PORT: 10140
+  DEPLOY_USER: root
+
+jobs:
+  # 1. Kualitas kode: type check, unit test, build statis
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: papanote_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type Check
+        run: bun run check
+
+      - name: Unit & Integration Test
+        run: bun test
+        env:
+          TEST_DATABASE_URL: postgresql://test:test@localhost:5432/papanote_test
+
+      - name: Build Static Production
+        run: bun run build
+
+  # 2. Build & push Docker image ke GHCR (hanya push ke main)
+  build:
+    needs: ci
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # 3. Deploy ke VPS yura-infra. Aktifkan dengan repo variable DEPLOY_ENABLED=true
+  #    setelah semua secrets diisi (lihat README).
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: papanote-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare app directory
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ env.DEPLOY_HOST }}
+          port: ${{ env.DEPLOY_PORT }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: mkdir -p ${{ env.APP_DIR }}
+
+      - name: Copy manifests to server
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ env.DEPLOY_HOST }}
+          port: ${{ env.DEPLOY_PORT }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "docker-compose.yml,app.yml,caddy-snippet.caddyfile"
+          target: ${{ env.APP_DIR }}
+
+      - name: Deploy
+        uses: appleboy/ssh-action@v1
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          IMAGE_TAG: ${{ github.sha }}
+          APP_DIR: ${{ env.APP_DIR }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ vars.VAPID_SUBJECT || 'mailto:admin@yuramedia.com' }}
+        with:
+          host: ${{ env.DEPLOY_HOST }}
+          port: ${{ env.DEPLOY_PORT }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: REGISTRY,IMAGE_NAME,IMAGE_TAG,APP_DIR,GHCR_USER,GHCR_TOKEN,DATABASE_URL,SUPABASE_URL,SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,WEBHOOK_SECRET,VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY,VAPID_SUBJECT
+          script: |
+            set -e
+            cd "$APP_DIR"
+
+            umask 077
+            cat > .env.production <<EOF
+            DATABASE_URL=${DATABASE_URL}
+            SUPABASE_URL=${SUPABASE_URL}
+            SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+            SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+            WEBHOOK_SECRET=${WEBHOOK_SECRET}
+            VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+            VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+            VAPID_SUBJECT=${VAPID_SUBJECT}
+            EOF
+            sed -i 's/^[[:space:]]*//' .env.production
+            chmod 600 .env.production
+
+            echo "$GHCR_TOKEN" | docker login "$REGISTRY" -u "$GHCR_USER" --password-stdin
+            docker pull "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+
+            export ENVIRONMENT=production
+            export IMAGE_TAG
+            docker compose up -d --remove-orphans
+
+            cd /root/yura-infra
+            ./scripts/reload-databases.sh
+            ./scripts/reload-gateway.sh
+
+            sleep 5
+            docker ps --filter "name=papanote-production"
+            echo "✓ papanote deployed (${IMAGE_TAG})"

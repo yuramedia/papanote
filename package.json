@@ -1,0 +1,39 @@
+{
+  "name": "papanote",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Papan catatan visual tim — Svelte + Supabase realtime + PostgreSQL internal",
+  "scripts": {
+    "dev": "bun run --parallel dev:web dev:server",
+    "dev:web": "vite",
+    "dev:server": "bun --watch server/index.ts",
+    "build": "vite build",
+    "start": "bun server/index.ts",
+    "preview": "bun run build && bun run start",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "bun test",
+    "create-user": "bun scripts/create-user.ts",
+    "vapid": "bun scripts/generate-vapid.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@internationalized/date": "^3.12.4",
+    "@lucide/svelte": "^1.51.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/bun": "^1.4.2",
+    "@types/web-push": "^3.6.4",
+    "bits-ui": "^2.19.5",
+    "docx": "^9.8.1",
+    "svelte": "^5.57.1",
+    "svelte-check": "^4.7.6",
+    "svelte-dnd-action": "^0.9.79",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9",
+    "vite": "^8.3.2"
+  }
+}
