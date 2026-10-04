@@ -7,20 +7,20 @@ function num(name: string, fallback: number): number {
 }
 
 export const env = {
-  port: num('PORT', 3000),
-  supabaseUrl: process.env.SUPABASE_URL ?? '',
-  supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
-  databaseUrl: process.env.DATABASE_URL ?? '',
-  webhookSecret: process.env.WEBHOOK_SECRET ?? '',
-  vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? '',
-  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? '',
-  vapidSubject: process.env.VAPID_SUBJECT ?? 'mailto:admin@example.com',
-  historyRetentionDays: num('HISTORY_RETENTION_DAYS', 30),
-  historyRetentionDaysInternal: num('HISTORY_RETENTION_DAYS_INTERNAL', 30),
-  deletedCardGraceDays: num('DELETED_CARD_GRACE_DAYS', 7),
-  jobsEnabled: (process.env.JOBS_ENABLED ?? 'true') !== 'false',
-  distDir: process.env.DIST_DIR ?? 'dist',
+  get port() { return num('PORT', 3000); },
+  get supabaseUrl() { return process.env.SUPABASE_URL ?? ''; },
+  get supabaseAnonKey() { return process.env.SUPABASE_ANON_KEY ?? ''; },
+  get supabaseServiceRoleKey() { return process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''; },
+  get databaseUrl() { return process.env.DATABASE_URL ?? ''; },
+  get webhookSecret() { return process.env.WEBHOOK_SECRET ?? ''; },
+  get vapidPublicKey() { return process.env.VAPID_PUBLIC_KEY ?? ''; },
+  get vapidPrivateKey() { return process.env.VAPID_PRIVATE_KEY ?? ''; },
+  get vapidSubject() { return process.env.VAPID_SUBJECT ?? 'mailto:admin@example.com'; },
+  get historyRetentionDays() { return num('HISTORY_RETENTION_DAYS', 30); },
+  get historyRetentionDaysInternal() { return num('HISTORY_RETENTION_DAYS_INTERNAL', 30); },
+  get deletedCardGraceDays() { return num('DELETED_CARD_GRACE_DAYS', 7); },
+  get jobsEnabled() { return (process.env.JOBS_ENABLED ?? 'true') !== 'false'; },
+  get distDir() { return process.env.DIST_DIR ?? 'dist'; },
 };
 
 export const features = {

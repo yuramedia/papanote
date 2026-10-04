@@ -21,7 +21,8 @@ describe.skipIf(!url)('integrasi PostgreSQL internal', () => {
   });
 
   afterAll(async () => {
-    await sql?.close();
+    const { closeDb } = await import('../server/db/client');
+    await closeDb();
   });
 
   const cardId = '00000000-0000-4000-8000-000000000001';

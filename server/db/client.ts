@@ -9,3 +9,10 @@ export function db(): SQL {
   instance ??= new SQL(env.databaseUrl, { max: 10, idleTimeout: 30 });
   return instance;
 }
+
+export async function closeDb(): Promise<void> {
+  if (instance) {
+    await instance.close();
+    instance = null;
+  }
+}
