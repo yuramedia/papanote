@@ -14,7 +14,9 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "bun test",
     "create-user": "bun scripts/create-user.ts",
-    "vapid": "bun scripts/generate-vapid.ts"
+    "vapid": "bun scripts/generate-vapid.ts",
+    "migrate": "bun scripts/run-migrations.ts",
+    "seed": "bun scripts/seed.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

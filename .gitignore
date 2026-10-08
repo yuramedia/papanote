@@ -3,6 +3,8 @@ dist/
 .env
 .env.*
 !.env.example
+public/config.json
+!.public/config.json.example
 *.log
 .DS_Store
 coverage/
