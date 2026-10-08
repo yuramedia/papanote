@@ -1,0 +1,59 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy-pages:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build static site
+        run: bun run build
+
+      - name: Inject config.json & SPA 404 fallback
+        run: |
+          cat > dist/config.json <<'EOF'
+          {
+            "supabaseUrl": "https://bhwhyrcgmjaeyxwrlazf.supabase.co",
+            "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJod2h5cmNnbWphZXl4d3JsYXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NTg2NDYsImV4cCI6MjA4NDMzNDY0Nn0.u7Lmfc0WVx6IdjvNrkolBbTjQQJKPm3As28fPKS_muw",
+            "vapidPublicKey": "BOyV0jn_HDp3bRIAU4l0UgGaHgqPT4HU5-H5RLVRtLOgW32UlQH8I6ReIc6IrXY-0qAcGZcbPMyiKSn06Jor4Kc"
+          }
+          EOF
+          cp dist/index.html dist/404.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
