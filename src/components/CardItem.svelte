@@ -21,7 +21,9 @@
 >
   <p class="text-sm font-medium break-words text-slate-900">{card.title}</p>
   {#if card.content}
-    <p class="mt-1 line-clamp-2 text-xs break-words whitespace-pre-line text-slate-500">{card.content}</p>
+    <p class="mt-1 line-clamp-2 text-xs break-words whitespace-pre-line text-slate-500 font-mono">
+      {card.content.replace(/^#+\s+/gm, '').replace(/\[\[(.*?)\]\]/g, '$1')}
+    </p>
   {/if}
   <div class="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
     <span class="text-slate-400" title="Diunggah {formatDateTime(card.uploaded_at)}">

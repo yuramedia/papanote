@@ -53,3 +53,48 @@
   @apply flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 outline-none
     select-none data-highlighted:bg-slate-100 data-disabled:opacity-40;
 }
+
+/* Obsidian-style Markdown Rendering Typography */
+.markdown-body {
+  @apply text-sm text-slate-800 leading-relaxed font-sans;
+}
+.markdown-body h1 {
+  @apply text-xl font-bold text-slate-900 mt-4 mb-2 pb-1 border-b border-slate-200;
+}
+.markdown-body h2 {
+  @apply text-lg font-semibold text-slate-900 mt-3 mb-1.5 pb-0.5 border-b border-slate-100;
+}
+.markdown-body h3 {
+  @apply text-base font-semibold text-slate-900 mt-2 mb-1;
+}
+.markdown-body p {
+  @apply my-2;
+}
+.markdown-body ul {
+  @apply list-disc list-inside my-2 space-y-1;
+}
+.markdown-body ol {
+  @apply list-decimal list-inside my-2 space-y-1;
+}
+.markdown-body blockquote {
+  @apply border-l-4 border-brand-500 pl-3 my-2 text-slate-600 italic bg-brand-50/40 py-1 rounded-r;
+}
+.markdown-body code {
+  @apply bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-xs font-mono font-medium;
+}
+.markdown-body pre {
+  @apply bg-slate-900 text-slate-100 p-3 rounded-lg overflow-x-auto my-3 text-xs font-mono;
+}
+.markdown-body pre code {
+  @apply bg-transparent text-inherit p-0;
+}
+.markdown-body hr {
+  @apply my-4 border-slate-200;
+}
+.markdown-body a {
+  @apply text-brand-600 underline hover:text-brand-700;
+}
+.markdown-body input[type="checkbox"] {
+  @apply rounded border-slate-300 text-brand-600 mr-1.5 align-middle;
+}
+

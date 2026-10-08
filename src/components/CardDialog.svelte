@@ -6,6 +6,8 @@
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import History from '@lucide/svelte/icons/history';
   import Bell from '@lucide/svelte/icons/bell';
+  import Eye from '@lucide/svelte/icons/eye';
+  import Pencil from '@lucide/svelte/icons/pencil';
   import HistoryPanel from './HistoryPanel.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import type { BoardStore } from '../lib/board.svelte';
@@ -13,6 +15,8 @@
   import { deadlineState, formatDateTime, fromLocalInput, toLocalInput } from '../lib/format';
   import { enablePush, pushMessage } from '../lib/push';
   import { toast } from '../lib/toast.svelte';
+  import { renderMarkdown } from '../lib/markdown';
+  import { router } from '../lib/router.svelte';
 
   let { card, store, onclose }: { card: Card; store: BoardStore; onclose: () => void } = $props();
 
@@ -23,6 +27,8 @@
   let saveState = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
   let showHistory = $state(false);
   let confirmOpen = $state(false);
+  // Mode tampilan catatan: preview (Obsidian view) vs edit (Markdown raw)
+  let mode = $state<'preview' | 'edit'>('preview');
 
   $effect(() => {
     const c = card;
@@ -58,6 +64,24 @@
       if (result !== 'enabled') toast.error(pushMessage(result));
     }
     await save({ enable_notification: on });
+  }
+
+  function handleWikilinkClick(e: MouseEvent) {
+    const target = (e.target as HTMLElement).closest('[data-wikilink]') as HTMLElement | null;
+    if (!target) return;
+    e.preventDefault();
+    const rawTarget = decodeURIComponent(target.getAttribute('data-wikilink') || '').trim();
+    if (!rawTarget) return;
+
+    // Cari kartu berdasarkan id atau judul persis / case-insensitive
+    const match = store.cards.find(
+      (c) => c.id === rawTarget || c.title.toLowerCase() === rawTarget.toLowerCase(),
+    );
+    if (match) {
+      router.go(`/board/${store.board?.id}/card/${match.id}`);
+    } else {
+      toast.show(`Kartu "${rawTarget}" belum ditemukan di papan ini.`, 'info');
+    }
   }
 </script>
 
@@ -95,15 +119,56 @@
 
       <div class="grid flex-1 gap-5 overflow-y-auto p-5 md:grid-cols-[1fr_14rem]">
         <div class="min-w-0">
-          <label for="card-content" class="mb-1.5 block text-sm font-medium text-slate-700">Catatan</label>
-          <textarea
-            id="card-content"
-            class="input min-h-64 resize-y font-mono text-[13px] leading-relaxed"
-            placeholder="Tulis catatan… (tersimpan otomatis saat klik di luar area ini)"
-            bind:value={content}
-            onfocus={() => (focused = 'content')}
-            onblur={blurContent}
-          ></textarea>
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Catatan Markdown</span>
+            <div class="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5 text-xs">
+              <button
+                type="button"
+                class="flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition {mode === 'preview' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}"
+                onclick={() => (mode = 'preview')}
+              >
+                <Eye class="size-3.5" /> Preview
+              </button>
+              <button
+                type="button"
+                class="flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition {mode === 'edit' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}"
+                onclick={() => (mode = 'edit')}
+              >
+                <Pencil class="size-3.5" /> Edit
+              </button>
+            </div>
+          </div>
+
+          {#if mode === 'preview'}
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="markdown-body min-h-64 rounded-xl border border-slate-200 bg-slate-50/60 p-4 transition hover:border-slate-300"
+              onclick={handleWikilinkClick}
+            >
+              {@html renderMarkdown(content)}
+            </div>
+            <p class="mt-1.5 text-right text-[11px] text-slate-400">
+              Mendukung syntax Markdown standar &amp; wikilinks <code>[[Nama Kartu]]</code>
+            </p>
+          {:else}
+            <div class="space-y-1.5">
+              <textarea
+                id="card-content"
+                class="input min-h-64 resize-y font-mono text-[13px] leading-relaxed"
+                placeholder="Tulis catatan Markdown… Gunakan # Judul, - [ ] Checklist, atau [[Nama Kartu Lain]] untuk menghubungkan catatan."
+                bind:value={content}
+                onfocus={() => (focused = 'content')}
+                onblur={blurContent}
+              ></textarea>
+              <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                <span>Tips: Gunakan <code>[[Nama Kartu]]</code> untuk membuat tautan dua arah ala Obsidian.</span>
+                <button type="button" class="text-brand-600 font-medium underline" onclick={() => (mode = 'preview')}>
+                  Selesai mengedit &rarr;
+                </button>
+              </div>
+            </div>
+          {/if}
 
           <button class="btn-ghost mt-3 -ml-2" onclick={() => (showHistory = !showHistory)}>
             <History class="size-4" />
