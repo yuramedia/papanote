@@ -48,12 +48,23 @@ export async function enablePush(): Promise<PushResult> {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
       }));
-    const res = await fetch('/api/push/subscription', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...(await authHeader()) },
-      body: JSON.stringify(sub.toJSON()),
+
+    const subJson = sub.toJSON();
+    if (!subJson.endpoint || !subJson.keys?.p256dh || !subJson.keys?.auth) return 'error';
+
+    const sb = supabase();
+    const { data: sessionData } = await sb.auth.getSession();
+    const userId = sessionData.session?.user?.id;
+    if (!userId) return 'error';
+
+    const { error: insertError } = await sb.from('push_subscriptions').upsert({
+      endpoint: subJson.endpoint,
+      user_id: userId,
+      p256dh: subJson.keys.p256dh,
+      auth: subJson.keys.auth,
+      user_agent: navigator.userAgent,
     });
-    return res.ok ? 'enabled' : 'error';
+    return insertError ? 'error' : 'enabled';
   } catch (err) {
     console.error('Gagal mengaktifkan push:', err);
     return 'error';

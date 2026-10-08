@@ -2,10 +2,9 @@
 # Alasan: CSP default yura-infra tidak mengizinkan REST/Auth Supabase (https://*.supabase.co).
 # Ganti domain di bawah jika berbeda dari app.yml.
 papan.yuramedia.com {
-	reverse_proxy {$PAPANOTE_CONTAINER}:3000 {
-		health_uri /api/health
-		health_interval 10s
-	}
+	root * /root/yura-infra/apps/papanote/dist
+	file_server
+	try_files {path} /index.html
 
 	import production_base_headers
 	header {

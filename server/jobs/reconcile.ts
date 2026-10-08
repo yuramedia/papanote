@@ -9,9 +9,10 @@ const CURSOR_COL: Record<SyncTable, string> = {
   lists: 'updated_at',
   cards: 'updated_at',
   card_histories: 'created_at',
+  push_subscriptions: 'created_at',
 };
 /** Urutan penting agar parent tersinkron lebih dulu. */
-const ORDER: SyncTable[] = ['boards', 'lists', 'cards', 'card_histories'];
+const ORDER: SyncTable[] = ['boards', 'lists', 'cards', 'card_histories', 'push_subscriptions'];
 
 /**
  * Tarik baris yang berubah sejak cursor terakhir dari Supabase → upsert ke internal.

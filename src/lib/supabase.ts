@@ -4,12 +4,25 @@ import type { AppConfig } from './types';
 let config: AppConfig | null = null;
 let client: SupabaseClient | null = null;
 
-/** Ambil konfigurasi publik dari server saat runtime (tidak di-bake saat build). */
+/** Ambil konfigurasi publik statis (dari /config.json atau import.meta.env). */
 export async function loadConfig(): Promise<AppConfig> {
   if (config) return config;
-  const res = await fetch('/api/config');
-  if (!res.ok) throw new Error(`Gagal memuat konfigurasi (${res.status})`);
-  config = (await res.json()) as AppConfig;
+  try {
+    const res = await fetch('/config.json', { cache: 'no-cache' });
+    if (res.ok) {
+      config = (await res.json()) as AppConfig;
+      return config;
+    }
+  } catch {
+    // fallback jika config.json tidak ada atau gagal
+  }
+
+  // Fallback ke Vite environment variables jika ada saat build
+  config = {
+    supabaseUrl: (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SUPABASE_URL ?? '',
+    supabaseAnonKey: (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SUPABASE_ANON_KEY ?? '',
+    vapidPublicKey: (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_VAPID_PUBLIC_KEY ?? '',
+  };
   return config;
 }
 

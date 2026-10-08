@@ -1,13 +1,13 @@
 # Metadata app untuk yura-infra (scripts/reload-gateway.sh & reload-databases.sh)
 key: papanote
-container: papanote-production
+container: papanote-worker-production
+# port tidak diekspos container karena frontend disajikan langsung oleh Caddy (file_server)
 port: 3000
-health_path: /api/health
+health_path: /
 # TODO: ganti dengan domain final, lalu sesuaikan juga caddy-snippet.caddyfile
 domain: papan.yuramedia.com
 expose: true
 tls: auto
-# CSP default memblokir REST API Supabase → routing & header diatur di caddy-snippet.caddyfile
 security_profile: default
 # Buatkan database "papanote" + user "papanote_user" di yura-postgres (source of truth)
 needs_postgres: true

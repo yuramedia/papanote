@@ -39,7 +39,7 @@ export function startJobs(): void {
     return;
   }
   if (features.supabaseAdmin) {
-    every('reconcile', 5 * MINUTE, reconcile);
+    every('reconcile', MINUTE, reconcile);
     const scheduleCleanup = () =>
       setTimeout(async () => {
         try {

@@ -12,6 +12,7 @@ export const SYNC_TABLES = {
     'created_by', 'updated_by', 'deleted_at', 'uploaded_at', 'updated_at',
   ],
   card_histories: ['id', 'card_id', 'old_content', 'changed_by', 'created_at'],
+  push_subscriptions: ['endpoint', 'user_id', 'p256dh', 'auth', 'user_agent', 'created_at'],
 } as const;
 
 export type SyncTable = keyof typeof SYNC_TABLES;
@@ -46,14 +47,15 @@ export function parseWebhookPayload(body: unknown): WebhookPayload | null {
   };
 }
 
-/** Ambil hanya kolom yang di-whitelist. Melempar error jika id tidak ada. */
+/** Ambil hanya kolom yang di-whitelist. Melempar error jika primary key tidak ada. */
 export function pickColumns(table: SyncTable, record: Row): Row {
   const out: Row = {};
   for (const col of SYNC_TABLES[table]) {
     if (Object.hasOwn(record, col)) out[col] = record[col];
   }
-  if (typeof out.id !== 'string' || out.id === '') {
-    throw new Error(`record ${table} tanpa id`);
+  const pk = table === 'push_subscriptions' ? 'endpoint' : 'id';
+  if (typeof out[pk] !== 'string' || out[pk] === '') {
+    throw new Error(`record ${table} tanpa ${pk}`);
   }
   return out;
 }
@@ -62,21 +64,28 @@ export function pickColumns(table: SyncTable, record: Row): Row {
  * Bangun query upsert berparameter.
  * - Tabel versioned: update hanya jika updated_at yang masuk >= yang tersimpan (last-write-wins),
  *   sehingga event yang datang terlambat/duplikat tidak menimpa data yang lebih baru.
- * - card_histories: insert sekali, abaikan duplikat.
+ * - card_histories / push_subscriptions: insert sekali / update profil.
  */
 export function buildUpsert(table: SyncTable, row: Row): { text: string; params: unknown[] } {
   const cols = Object.keys(row);
   const params = cols.map((c) => row[c]);
   const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
   const colList = cols.map((c) => `"${c}"`).join(', ');
-  let text = `INSERT INTO "${table}" (${colList}) VALUES (${placeholders}) ON CONFLICT ("id") DO `;
+  const pk = table === 'push_subscriptions' ? 'endpoint' : 'id';
+  let text = `INSERT INTO "${table}" (${colList}) VALUES (${placeholders}) ON CONFLICT ("${pk}") DO `;
   if (VERSIONED.has(table)) {
     const updates = cols
-      .filter((c) => c !== 'id')
+      .filter((c) => c !== pk)
       .map((c) => `"${c}" = EXCLUDED."${c}"`)
       .concat('"synced_at" = now()')
       .join(', ');
     text += `UPDATE SET ${updates} WHERE "${table}"."updated_at" <= EXCLUDED."updated_at"`;
+  } else if (table === 'push_subscriptions') {
+    const updates = cols
+      .filter((c) => c !== 'endpoint')
+      .map((c) => `"${c}" = EXCLUDED."${c}"`)
+      .join(', ');
+    text += `UPDATE SET ${updates}`;
   } else {
     text += 'NOTHING';
   }

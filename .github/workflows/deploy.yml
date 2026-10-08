@@ -157,6 +157,22 @@ jobs:
             echo "$GHCR_TOKEN" | docker login "$REGISTRY" -u "$GHCR_USER" --password-stdin
             docker pull "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
 
+            # Ekstrak folder dist/ dari Docker image ke host agar Caddy bisa melayani file statis
+            rm -rf dist
+            CONTAINER_ID=$(docker create "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}")
+            docker cp "$CONTAINER_ID:/app/dist" ./dist
+            docker rm "$CONTAINER_ID" > /dev/null
+
+            # Buat file config.json statis di root dist untuk dibaca frontend di browser
+            cat > ./dist/config.json <<EOF
+            {
+              "supabaseUrl": "${SUPABASE_URL}",
+              "supabaseAnonKey": "${SUPABASE_ANON_KEY}",
+              "vapidPublicKey": "${VAPID_PUBLIC_KEY}"
+            }
+            EOF
+            chmod 644 ./dist/config.json
+
             export ENVIRONMENT=production
             export IMAGE_TAG
             docker compose up -d --remove-orphans
@@ -166,5 +182,5 @@ jobs:
             ./scripts/reload-gateway.sh
 
             sleep 5
-            docker ps --filter "name=papanote-production"
-            echo "✓ papanote deployed (${IMAGE_TAG})"
+            docker ps --filter "name=papanote-worker-production"
+            echo "✓ papanote static & worker deployed (${IMAGE_TAG})"

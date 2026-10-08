@@ -38,6 +38,5 @@ COPY --chown=appuser:bunjs server ./server
 COPY --chown=appuser:bunjs scripts ./scripts
 
 USER appuser
-EXPOSE 3000
 
-CMD ["dumb-init", "bun", "server/index.ts"]
+CMD ["dumb-init", "bun", "server/worker.ts"]

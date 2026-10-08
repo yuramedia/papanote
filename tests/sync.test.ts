@@ -36,7 +36,7 @@ describe('parseWebhookPayload', () => {
 describe('whitelist', () => {
   test('tabel yang dikenal', () => {
     expect(isSyncTable('cards')).toBe(true);
-    expect(isSyncTable('push_subscriptions')).toBe(false);
+    expect(isSyncTable('push_subscriptions')).toBe(true);
     expect(isSyncTable('__proto__')).toBe(false);
   });
   test('kolom asing dibuang', () => {
