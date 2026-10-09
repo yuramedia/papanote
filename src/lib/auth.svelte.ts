@@ -39,6 +39,12 @@ class AuthStore {
     return error.message;
   }
 
+  async updatePassword(password: string): Promise<string | null> {
+    const { error } = await supabase().auth.updateUser({ password });
+    if (!error) return null;
+    return error.message;
+  }
+
   async signOut() {
     await supabase().auth.signOut();
   }
