@@ -22,7 +22,7 @@
   {/if}
   <div class="ml-auto flex items-center gap-2">
     {@render children?.()}
-    {#if auth.user?.email === 'admin@yuramedia.com'}
+    {#if auth.isAdmin}
       <button
         class="btn bg-white/10 hover:bg-white/20 text-white text-xs flex items-center gap-1.5 py-1.5 px-3 rounded-lg font-medium transition-colors cursor-pointer"
         onclick={() => (openAdmin = true)}

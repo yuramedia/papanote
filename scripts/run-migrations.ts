@@ -12,7 +12,8 @@ const files = [
   '002_triggers.sql',
   '003_rls_realtime.sql',
   '004_push_subscriptions.sql',
-  '005_admin_users.sql'
+  '005_admin_users.sql',
+  '006_multi_admin.sql'
 ];
 
 async function run() {

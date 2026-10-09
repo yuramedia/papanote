@@ -4,11 +4,14 @@
   import Users from '@lucide/svelte/icons/users';
   import UserPlus from '@lucide/svelte/icons/user-plus';
   import ShieldCheck from '@lucide/svelte/icons/shield-check';
+  import ShieldAlert from '@lucide/svelte/icons/shield-alert';
   import Dices from '@lucide/svelte/icons/dices';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import UserCheck from '@lucide/svelte/icons/user-check';
   import { supabase } from '../lib/supabase';
   import { toast } from '../lib/toast.svelte';
+  import { auth } from '../lib/auth.svelte';
   import { formatDateTime } from '../lib/format';
 
   let { open = $bindable(false) }: { open?: boolean } = $props();
@@ -18,6 +21,7 @@
     email: string;
     created_at: string;
     last_sign_in_at: string | null;
+    is_admin: boolean;
   }
 
   let users = $state<AdminUser[]>([]);
@@ -25,8 +29,11 @@
 
   let newEmail = $state('');
   let newPassword = $state('');
+  let makeAdmin = $state(false);
   let submitting = $state(false);
   let formError = $state<string | null>(null);
+
+  let changingRole = $state<string | null>(null);
 
   function generateRandomPassword() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
@@ -81,15 +88,21 @@
       const { data, error } = await supabase().rpc('admin_create_user', {
         new_email: email,
         new_password: password,
+        make_admin: makeAdmin,
       });
 
       if (error) {
         formError = error.message;
         toast.error(error.message);
       } else {
-        toast.success(`Akun ${email} berhasil dibuat!`);
+        toast.success(
+          makeAdmin
+            ? `Akun Admin baru (${email}) berhasil dibuat!`
+            : `Akun anggota (${email}) berhasil dibuat!`
+        );
         newEmail = '';
         newPassword = '';
+        makeAdmin = false;
         await loadUsers();
       }
     } catch (err) {
@@ -98,6 +111,33 @@
       toast.error(msg);
     } finally {
       submitting = false;
+    }
+  }
+
+  async function handleToggleRole(targetEmail: string, currentIsAdmin: boolean) {
+    changingRole = targetEmail;
+    try {
+      const nextIsAdmin = !currentIsAdmin;
+      const { error } = await supabase().rpc('admin_set_role', {
+        target_email: targetEmail,
+        make_admin: nextIsAdmin,
+      });
+
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success(
+          nextIsAdmin
+            ? `Berhasil memberikan hak akses Admin kepada ${targetEmail}`
+            : `Hak akses Admin untuk ${targetEmail} telah dicabut.`
+        );
+        await loadUsers();
+        await auth.checkAdmin();
+      }
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      changingRole = null;
     }
   }
 </script>
@@ -115,10 +155,10 @@
           </span>
           <div>
             <Dialog.Title class="text-lg font-semibold text-slate-900">
-              Kelola Pengguna Tim
+              Kelola Pengguna & Hak Akses
             </Dialog.Title>
             <p class="text-xs text-slate-500">
-              Tambah akun baru untuk anggota tim dan tinjau pengguna yang terdaftar.
+              Tambah akun anggota baru, atur role Admin, dan pantau status tim.
             </p>
           </div>
         </div>
@@ -157,7 +197,7 @@
                 </label>
                 <button
                   type="button"
-                  class="flex items-center gap-1 text-[11px] font-medium text-brand-600 hover:text-brand-700"
+                  class="flex items-center gap-1 text-[11px] font-medium text-brand-600 hover:text-brand-700 cursor-pointer"
                   onclick={generateRandomPassword}
                 >
                   <Dices class="size-3" />
@@ -175,13 +215,18 @@
             </div>
           </div>
 
-          {#if formError}
-            <p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-              {formError}
-            </p>
-          {/if}
+          <div class="flex items-center justify-between pt-1">
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                class="rounded border-slate-300 text-brand-600 focus:ring-brand-500 size-4 cursor-pointer"
+                bind:checked={makeAdmin}
+              />
+              <span class="text-xs font-medium text-slate-700">
+                Berikan Hak Akses Admin (Multi-Admin)
+              </span>
+            </label>
 
-          <div class="flex justify-end pt-1">
             <button
               type="submit"
               class="btn-primary text-xs py-2 px-4 shadow-sm"
@@ -192,9 +237,15 @@
               {:else}
                 <UserPlus class="size-3.5" />
               {/if}
-              Buat Akun Anggota
+              Buat Akun
             </button>
           </div>
+
+          {#if formError}
+            <p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+              {formError}
+            </p>
+          {/if}
         </form>
       </section>
 
@@ -231,27 +282,60 @@
               <thead class="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
                 <tr>
                   <th class="py-2.5 px-3">Email Pengguna</th>
-                  <th class="py-2.5 px-3">Terdaftar</th>
-                  <th class="py-2.5 px-3">Terakhir Login</th>
+                  <th class="py-2.5 px-3">Role</th>
+                  <th class="py-2.5 px-3 hidden sm:table-cell">Terdaftar</th>
+                  <th class="py-2.5 px-3 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100 text-slate-700">
                 {#each users as u (u.id)}
                   <tr class="hover:bg-slate-50/50 transition-colors">
-                    <td class="py-2.5 px-3 font-medium flex items-center gap-2">
-                      {#if u.email === 'admin@yuramedia.com'}
-                        <span class="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-600/20">
+                    <td class="py-2.5 px-3 font-medium">
+                      <span>{u.email}</span>
+                      <div class="text-[10px] text-slate-400 sm:hidden">
+                        Masuk: {u.last_sign_in_at ? formatDateTime(u.last_sign_in_at) : 'Belum pernah'}
+                      </div>
+                    </td>
+                    <td class="py-2.5 px-3">
+                      {#if u.is_admin}
+                        <span class="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-600/20">
                           <ShieldCheck class="size-3" />
                           Admin
                         </span>
+                      {:else}
+                        <span class="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                          <UserCheck class="size-3 text-slate-400" />
+                          Anggota
+                        </span>
                       {/if}
-                      <span>{u.email}</span>
                     </td>
-                    <td class="py-2.5 px-3 text-slate-500">
+                    <td class="py-2.5 px-3 text-slate-500 hidden sm:table-cell">
                       {formatDateTime(u.created_at)}
                     </td>
-                    <td class="py-2.5 px-3 text-slate-500">
-                      {u.last_sign_in_at ? formatDateTime(u.last_sign_in_at) : 'Belum pernah'}
+                    <td class="py-2.5 px-3 text-right">
+                      {#if u.email === 'admin@yuramedia.com'}
+                        <span class="text-[11px] text-slate-400 italic">Root Admin</span>
+                      {:else}
+                        <button
+                          type="button"
+                          class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer {u.is_admin
+                            ? 'bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700'
+                            : 'bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800'}"
+                          disabled={changingRole === u.email}
+                          onclick={() => handleToggleRole(u.email, u.is_admin)}
+                          title={u.is_admin ? 'Cabut hak akses admin' : 'Jadikan admin'}
+                        >
+                          {#if changingRole === u.email}
+                            <LoaderCircle class="size-3 animate-spin" />
+                          {:else if u.is_admin}
+                            <ShieldAlert class="size-3" />
+                            Cabut Admin
+                          {:else}
+                            <ShieldCheck class="size-3" />
+                            Jadikan Admin
+                          {/if}
+                        </button>
+                      {/if}
                     </td>
                   </tr>
                 {/each}
