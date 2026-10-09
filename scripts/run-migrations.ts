@@ -7,7 +7,13 @@ if (!ref || !token) {
   console.error('SUPABASE_PROJECT_REF and SUPABASE_ACCESS_TOKEN environment variables required');
   process.exit(1);
 }
-const files = ['001_schema.sql', '002_triggers.sql', '003_rls_realtime.sql', '004_push_subscriptions.sql'];
+const files = [
+  '001_schema.sql',
+  '002_triggers.sql',
+  '003_rls_realtime.sql',
+  '004_push_subscriptions.sql',
+  '005_admin_users.sql'
+];
 
 async function run() {
   for (const file of files) {
