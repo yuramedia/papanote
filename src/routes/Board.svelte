@@ -8,12 +8,14 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import Kanban from '@lucide/svelte/icons/kanban';
   import Network from '@lucide/svelte/icons/network';
+  import Layers from '@lucide/svelte/icons/layers';
   import Search from '@lucide/svelte/icons/search';
   import TopBar from '../components/TopBar.svelte';
   import ListColumn from '../components/ListColumn.svelte';
   import CardDialog from '../components/CardDialog.svelte';
   import ConfirmDialog from '../components/ConfirmDialog.svelte';
   import GraphView from '../components/GraphView.svelte';
+  import CanvasView from '../components/CanvasView.svelte';
   import QuickSwitcherModal from '../components/QuickSwitcherModal.svelte';
   import { BoardStore } from '../lib/board.svelte';
   import { router } from '../lib/router.svelte';
@@ -24,7 +26,7 @@
 
   // svelte-ignore state_referenced_locally — komponen di-key per boardId di App.svelte
   const store = new BoardStore(boardId);
-  let viewMode = $state<'kanban' | 'graph'>('kanban');
+  let viewMode = $state<'kanban' | 'graph' | 'canvas'>('kanban');
   let openQuickSwitcher = $state(false);
   let newList = $state('');
   let exporting = $state(false);
@@ -99,7 +101,18 @@
         title="Tampilan Obsidian Graph View"
       >
         <Network class="size-3.5" />
-        <span class="hidden sm:inline">Graph View</span>
+        <span class="hidden sm:inline">Graph</span>
+      </button>
+      <button
+        type="button"
+        class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'canvas'
+          ? 'bg-indigo-600 text-white shadow-sm'
+          : 'text-white/70 hover:text-white'}"
+        onclick={() => (viewMode = 'canvas')}
+        title="Tampilan Obsidian Infinite Canvas"
+      >
+        <Layers class="size-3.5" />
+        <span class="hidden sm:inline">Canvas</span>
       </button>
     </div>
 
@@ -172,9 +185,13 @@
         {/if}
       </form>
     </main>
-  {:else}
+  {:else if viewMode === 'graph'}
     <div class="flex flex-1 overflow-hidden">
       <GraphView {store} onopen={openCardById} />
+    </div>
+  {:else}
+    <div class="flex flex-1 overflow-hidden">
+      <CanvasView {store} onopen={openCardById} />
     </div>
   {/if}
 </div>
