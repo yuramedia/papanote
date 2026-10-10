@@ -11,6 +11,7 @@
   import HistoryPanel from './HistoryPanel.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import BacklinksPanel from './BacklinksPanel.svelte';
+  import WikilinkPreviewPopover from './WikilinkPreviewPopover.svelte';
   import type { BoardStore } from '../lib/board.svelte';
   import type { Card } from '../lib/types';
   import { deadlineState, formatDateTime, fromLocalInput, toLocalInput } from '../lib/format';
@@ -136,10 +137,18 @@
     await save({ enable_notification: on });
   }
 
+  // Hover Preview Popover (Obsidian Page Preview)
+  let previewTargetCard = $state<Card | null>(null);
+  let previewPosition = $state<{ x: number; y: number; placeAbove?: boolean }>({ x: 0, y: 0 });
+  let previewVisible = $state(false);
+  let hoverTimer: number | null = null;
+  let closeTimer: number | null = null;
+
   function handleWikilinkClick(e: MouseEvent) {
     const target = (e.target as HTMLElement).closest('[data-wikilink]') as HTMLElement | null;
     if (!target) return;
     e.preventDefault();
+    previewVisible = false;
     const rawTarget = decodeURIComponent(target.getAttribute('data-wikilink') || '').trim();
     if (!rawTarget) return;
 
@@ -152,6 +161,45 @@
     } else {
       toast.show(`Kartu "${rawTarget}" belum ditemukan di papan ini.`, 'info');
     }
+  }
+
+  function handleWikilinkMouseOver(e: MouseEvent) {
+    const linkEl = (e.target as HTMLElement).closest('[data-wikilink]') as HTMLElement | null;
+    if (!linkEl) return;
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+
+    const rawTarget = decodeURIComponent(linkEl.getAttribute('data-wikilink') || '').trim();
+    if (!rawTarget) return;
+
+    const match = store.cards.find(
+      (c) => c.id === rawTarget || c.title.toLowerCase() === rawTarget.toLowerCase(),
+    );
+    if (!match) return;
+
+    const rect = linkEl.getBoundingClientRect();
+    const placeAbove = rect.bottom + 230 > window.innerHeight;
+    const posX = Math.min(rect.left, window.innerWidth - 350);
+    const posY = placeAbove ? rect.top - 8 : rect.bottom + 8;
+
+    if (hoverTimer) clearTimeout(hoverTimer);
+    hoverTimer = window.setTimeout(() => {
+      previewTargetCard = match;
+      previewPosition = { x: Math.max(16, posX), y: posY, placeAbove };
+      previewVisible = true;
+    }, 200);
+  }
+
+  function handleWikilinkMouseLeave() {
+    if (hoverTimer) {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+    }
+    closeTimer = window.setTimeout(() => {
+      previewVisible = false;
+    }, 200);
   }
 </script>
 
@@ -212,9 +260,12 @@
           {#if mode === 'preview'}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <!-- svelte-ignore a11y_mouse_events_have_key_events -->
             <div
               class="markdown-body min-h-64 rounded-xl border border-slate-200 bg-slate-50/60 p-4 transition hover:border-slate-300"
               onclick={handleWikilinkClick}
+              onmouseover={handleWikilinkMouseOver}
+              onmouseleave={handleWikilinkMouseLeave}
             >
               {@html renderMarkdown(content)}
             </div>
@@ -364,6 +415,25 @@
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
+
+<!-- Popover Pratinjau Mengambang Tautan (Obsidian Hover Preview) -->
+<WikilinkPreviewPopover
+  targetCard={previewTargetCard}
+  {store}
+  position={previewPosition}
+  visible={previewVisible}
+  onopen={(targetId) => {
+    previewVisible = false;
+    router.go(`/board/${store.board?.id}/card/${targetId}`);
+  }}
+  onmouseenter={() => {
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+  }}
+  onmouseleave={handleWikilinkMouseLeave}
+/>
 
 <ConfirmDialog
   bind:open={confirmOpen}
