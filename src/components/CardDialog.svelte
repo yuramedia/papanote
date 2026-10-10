@@ -10,6 +10,7 @@
   import Pencil from '@lucide/svelte/icons/pencil';
   import HistoryPanel from './HistoryPanel.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
+  import BacklinksPanel from './BacklinksPanel.svelte';
   import type { BoardStore } from '../lib/board.svelte';
   import type { Card } from '../lib/types';
   import { deadlineState, formatDateTime, fromLocalInput, toLocalInput } from '../lib/format';
@@ -187,6 +188,15 @@
               />
             </div>
           {/if}
+
+          <!-- Panel Tautan Balik (Obsidian Backlinks) -->
+          <BacklinksPanel
+            currentCard={card}
+            {store}
+            onnavigate={(targetId) => {
+              router.go(`/board/${store.board?.id}/card/${targetId}`);
+            }}
+          />
         </div>
 
         <aside class="space-y-5">
