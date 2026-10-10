@@ -6,10 +6,13 @@
   import WifiOff from '@lucide/svelte/icons/wifi-off';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+  import Kanban from '@lucide/svelte/icons/kanban';
+  import Network from '@lucide/svelte/icons/network';
   import TopBar from '../components/TopBar.svelte';
   import ListColumn from '../components/ListColumn.svelte';
   import CardDialog from '../components/CardDialog.svelte';
   import ConfirmDialog from '../components/ConfirmDialog.svelte';
+  import GraphView from '../components/GraphView.svelte';
   import { BoardStore } from '../lib/board.svelte';
   import { router } from '../lib/router.svelte';
   import { toast } from '../lib/toast.svelte';
@@ -19,6 +22,7 @@
 
   // svelte-ignore state_referenced_locally — komponen di-key per boardId di App.svelte
   const store = new BoardStore(boardId);
+  let viewMode = $state<'kanban' | 'graph'>('kanban');
   let newList = $state('');
   let exporting = $state(false);
   let listToDelete = $state<List | null>(null);
@@ -58,6 +62,31 @@
 
 <div class="flex h-full flex-col bg-gradient-to-br from-brand-700 via-brand-800 to-slate-900">
   <TopBar title={store.board?.title ?? ''}>
+    <div class="flex items-center rounded-xl bg-white/10 p-1 text-xs">
+      <button
+        type="button"
+        class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'kanban'
+          ? 'bg-white text-slate-900 shadow-sm'
+          : 'text-white/70 hover:text-white'}"
+        onclick={() => (viewMode = 'kanban')}
+        title="Tampilan Kanban Board"
+      >
+        <Kanban class="size-3.5" />
+        <span class="hidden sm:inline">Kanban</span>
+      </button>
+      <button
+        type="button"
+        class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'graph'
+          ? 'bg-indigo-600 text-white shadow-sm'
+          : 'text-white/70 hover:text-white'}"
+        onclick={() => (viewMode = 'graph')}
+        title="Tampilan Obsidian Graph View"
+      >
+        <Network class="size-3.5" />
+        <span class="hidden sm:inline">Graph View</span>
+      </button>
+    </div>
+
     <span
       class="hidden items-center gap-1 rounded-full px-2 py-0.5 text-xs sm:inline-flex {store.connected
         ? 'bg-emerald-500/20 text-emerald-300'
@@ -89,7 +118,7 @@
         </button>
       </div>
     </div>
-  {:else}
+  {:else if viewMode === 'kanban'}
     <main class="flex flex-1 items-start gap-3 overflow-x-auto p-4">
       {#each store.sortedLists as list, i (list.id)}
         <ListColumn
@@ -117,6 +146,10 @@
         {/if}
       </form>
     </main>
+  {:else}
+    <div class="flex flex-1 overflow-hidden">
+      <GraphView {store} onopen={openCardById} />
+    </div>
   {/if}
 </div>
 
