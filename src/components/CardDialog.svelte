@@ -31,6 +31,73 @@
   // Mode tampilan catatan: preview (Obsidian view) vs edit (Markdown raw)
   let mode = $state<'preview' | 'edit'>('preview');
 
+  // Autocomplete Wikilinks [[
+  let textareaEl = $state<HTMLTextAreaElement | null>(null);
+  let showSuggest = $state(false);
+  let suggestQuery = $state('');
+  let suggestIndex = $state(0);
+  let suggestStartPos = $state(0);
+
+  const suggestCards = $derived.by<Card[]>(() => {
+    if (!showSuggest) return [];
+    const q = suggestQuery.trim().toLowerCase();
+    const others = store.cards.filter((c) => !c.deleted_at && c.id !== card.id);
+    if (!q) return others.slice(0, 8);
+    return others.filter((c) => c.title.toLowerCase().includes(q)).slice(0, 8);
+  });
+
+  function handleTextareaInput() {
+    if (!textareaEl) return;
+    const cursorPos = textareaEl.selectionStart;
+    const textBeforeCursor = content.slice(0, cursorPos);
+
+    // Cari pola [[ diikuti kata tanpa kurung tutup ]] pada baris saat ini
+    const match = textBeforeCursor.match(/\[\[([^\]\n]*)$/);
+    if (match) {
+      showSuggest = true;
+      suggestQuery = match[1];
+      suggestStartPos = cursorPos - match[0].length;
+      suggestIndex = 0;
+    } else {
+      showSuggest = false;
+    }
+  }
+
+  function handleTextareaKeyDown(e: KeyboardEvent) {
+    if (!showSuggest || suggestCards.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      suggestIndex = (suggestIndex + 1) % suggestCards.length;
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      suggestIndex = (suggestIndex - 1 + suggestCards.length) % suggestCards.length;
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      applySuggestion(suggestCards[suggestIndex]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      showSuggest = false;
+    }
+  }
+
+  function applySuggestion(chosen: Card) {
+    if (!textareaEl) return;
+    const cursorPos = textareaEl.selectionStart;
+    const before = content.slice(0, suggestStartPos);
+    const after = content.slice(cursorPos);
+    const inserted = `[[${chosen.title}]] `;
+    content = before + inserted + after;
+    showSuggest = false;
+    save({ content });
+
+    const newCursor = suggestStartPos + inserted.length;
+    setTimeout(() => {
+      textareaEl?.focus();
+      textareaEl?.setSelectionRange(newCursor, newCursor);
+    }, 10);
+  }
+
   $effect(() => {
     const c = card;
     if (focused !== 'title') title = c.title;
@@ -57,6 +124,8 @@
   function blurContent() {
     if (content !== (card.content ?? '')) save({ content });
     focused = null;
+    // Beri jeda agar klik pada saran autocomplete tidak tertutup mendadak
+    setTimeout(() => (showSuggest = false), 200);
   }
 
   async function toggleNotification(on: boolean) {
@@ -153,17 +222,55 @@
               Mendukung syntax Markdown standar &amp; wikilinks <code>[[Nama Kartu]]</code>
             </p>
           {:else}
-            <div class="space-y-1.5">
+            <div class="relative space-y-1.5">
               <textarea
                 id="card-content"
+                bind:this={textareaEl}
                 class="input min-h-64 resize-y font-mono text-[13px] leading-relaxed"
                 placeholder="Tulis catatan Markdown… Gunakan # Judul, - [ ] Checklist, atau [[Nama Kartu Lain]] untuk menghubungkan catatan."
                 bind:value={content}
                 onfocus={() => (focused = 'content')}
                 onblur={blurContent}
+                oninput={handleTextareaInput}
+                onkeydown={handleTextareaKeyDown}
               ></textarea>
+
+              <!-- Dropdown Saran Wikilink [[ (Obsidian Autocomplete) -->
+              {#if showSuggest && suggestCards.length > 0}
+                <div
+                  class="absolute left-2 right-2 bottom-12 z-20 max-h-48 overflow-y-auto rounded-xl border border-brand-200 bg-white p-1.5 shadow-xl animate-in fade-in-0 duration-100"
+                >
+                  <div class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                    <span>Saran Tautan [[ ({suggestQuery || 'Semua'})</span>
+                    <span class="font-normal lowercase">Enter/Tab untuk memilih</span>
+                  </div>
+                  {#each suggestCards as item, idx (item.id)}
+                    <button
+                      type="button"
+                      onmousedown={(e) => {
+                        e.preventDefault();
+                        applySuggestion(item);
+                      }}
+                      onmouseenter={() => (suggestIndex = idx)}
+                      class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition cursor-pointer {suggestIndex === idx
+                        ? 'bg-brand-600 text-white'
+                        : 'text-slate-800 hover:bg-slate-100'}"
+                    >
+                      <span class="font-medium truncate">[[{item.title}]]</span>
+                      <span
+                        class="rounded px-1.5 py-0.2 text-[10px] shrink-0 {suggestIndex === idx
+                          ? 'bg-brand-700/60 text-white'
+                          : 'bg-slate-100 text-slate-500'}"
+                      >
+                        {store.lists.find((l) => l.id === item.list_id)?.title ?? 'List'}
+                      </span>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+
               <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
-                <span>Tips: Gunakan <code>[[Nama Kartu]]</code> untuk membuat tautan dua arah ala Obsidian.</span>
+                <span>Tips: Ketik <code>[[</code> untuk saran tautan instan ala Obsidian.</span>
                 <button type="button" class="text-brand-600 font-medium underline" onclick={() => (mode = 'preview')}>
                   Selesai mengedit &rarr;
                 </button>

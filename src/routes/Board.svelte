@@ -8,11 +8,13 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import Kanban from '@lucide/svelte/icons/kanban';
   import Network from '@lucide/svelte/icons/network';
+  import Search from '@lucide/svelte/icons/search';
   import TopBar from '../components/TopBar.svelte';
   import ListColumn from '../components/ListColumn.svelte';
   import CardDialog from '../components/CardDialog.svelte';
   import ConfirmDialog from '../components/ConfirmDialog.svelte';
   import GraphView from '../components/GraphView.svelte';
+  import QuickSwitcherModal from '../components/QuickSwitcherModal.svelte';
   import { BoardStore } from '../lib/board.svelte';
   import { router } from '../lib/router.svelte';
   import { toast } from '../lib/toast.svelte';
@@ -23,6 +25,7 @@
   // svelte-ignore state_referenced_locally — komponen di-key per boardId di App.svelte
   const store = new BoardStore(boardId);
   let viewMode = $state<'kanban' | 'graph'>('kanban');
+  let openQuickSwitcher = $state(false);
   let newList = $state('');
   let exporting = $state(false);
   let listToDelete = $state<List | null>(null);
@@ -30,8 +33,21 @@
 
   const openCard = $derived(cardId ? store.findCard(cardId) : undefined);
 
-  onMount(() => store.load());
-  onDestroy(() => store.destroy());
+  function handleGlobalKeyDown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'o' || e.key === 'k')) {
+      e.preventDefault();
+      openQuickSwitcher = true;
+    }
+  }
+
+  onMount(() => {
+    store.load();
+    window.addEventListener('keydown', handleGlobalKeyDown);
+  });
+  onDestroy(() => {
+    store.destroy();
+    window.removeEventListener('keydown', handleGlobalKeyDown);
+  });
 
   const openCardById = (id: string) => router.go(`/board/${boardId}/card/${id}`);
   const closeCard = () => router.go(`/board/${boardId}`);
@@ -86,6 +102,16 @@
         <span class="hidden sm:inline">Graph View</span>
       </button>
     </div>
+
+    <button
+      type="button"
+      class="btn bg-white/10 text-white hover:bg-white/20 text-xs flex items-center gap-1.5"
+      onclick={() => (openQuickSwitcher = true)}
+      title="Cari Catatan Cepat (Ctrl + O / Ctrl + K)"
+    >
+      <Search class="size-3.5 text-indigo-300" />
+      <span class="hidden md:inline">Cari (Ctrl+O)</span>
+    </button>
 
     <span
       class="hidden items-center gap-1 rounded-full px-2 py-0.5 text-xs sm:inline-flex {store.connected
@@ -156,6 +182,8 @@
 {#if openCard}
   <CardDialog card={openCard} {store} onclose={closeCard} />
 {/if}
+
+<QuickSwitcherModal bind:open={openQuickSwitcher} {store} onselect={openCardById} />
 
 <ConfirmDialog
   bind:open={confirmOpen}
