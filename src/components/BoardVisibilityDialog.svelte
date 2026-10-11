@@ -243,8 +243,10 @@
 
 <Dialog.Root bind:open>
   <Dialog.Portal>
-    <Dialog.Overlay class="modal-overlay" />
-    <Dialog.Content class="modal-card max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+    <Dialog.Overlay class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm" />
+    <Dialog.Content
+      class="fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+    >
       <!-- Header Dialog -->
       <div class="flex items-start justify-between border-b border-slate-100 pb-4">
         <div class="flex items-center gap-2.5">
@@ -260,7 +262,7 @@
             </Dialog.Description>
           </div>
         </div>
-        <Dialog.Close class="modal-close">
+        <Dialog.Close class="btn-ghost p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
           <X class="size-4" />
         </Dialog.Close>
       </div>
