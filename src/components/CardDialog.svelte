@@ -8,6 +8,8 @@
   import Bell from '@lucide/svelte/icons/bell';
   import Eye from '@lucide/svelte/icons/eye';
   import Pencil from '@lucide/svelte/icons/pencil';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Plus from '@lucide/svelte/icons/plus';
   import HistoryPanel from './HistoryPanel.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import BacklinksPanel from './BacklinksPanel.svelte';
@@ -34,6 +36,7 @@
 
   // Autocomplete Wikilinks [[
   let textareaEl = $state<HTMLTextAreaElement | null>(null);
+  let suggestContainerEl = $state<HTMLDivElement | null>(null);
   let showSuggest = $state(false);
   let suggestQuery = $state('');
   let suggestIndex = $state(0);
@@ -46,6 +49,20 @@
     if (!q) return others.slice(0, 8);
     return others.filter((c) => c.title.toLowerCase().includes(q)).slice(0, 8);
   });
+
+  const canCreateNew = $derived.by<boolean>(() => {
+    if (!showSuggest) return false;
+    const q = suggestQuery.trim();
+    if (!q) return false;
+    return !store.cards.some((c) => !c.deleted_at && c.title.toLowerCase() === q.toLowerCase());
+  });
+
+  function scrollToActiveSuggest() {
+    setTimeout(() => {
+      const activeEl = suggestContainerEl?.querySelector('[data-active="true"]') as HTMLElement | null;
+      activeEl?.scrollIntoView({ block: 'nearest' });
+    }, 10);
+  }
 
   function handleTextareaInput() {
     if (!textareaEl) return;
@@ -65,30 +82,40 @@
   }
 
   function handleTextareaKeyDown(e: KeyboardEvent) {
-    if (!showSuggest || suggestCards.length === 0) return;
+    if (!showSuggest) return;
+    const totalOptions = suggestCards.length + (canCreateNew ? 1 : 0);
+    if (totalOptions === 0) return;
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      suggestIndex = (suggestIndex + 1) % suggestCards.length;
+      suggestIndex = (suggestIndex + 1) % totalOptions;
+      scrollToActiveSuggest();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      suggestIndex = (suggestIndex - 1 + suggestCards.length) % suggestCards.length;
+      suggestIndex = (suggestIndex - 1 + totalOptions) % totalOptions;
+      scrollToActiveSuggest();
     } else if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
-      applySuggestion(suggestCards[suggestIndex]);
+      if (suggestIndex < suggestCards.length) {
+        applySuggestion(suggestCards[suggestIndex].title);
+      } else if (canCreateNew) {
+        applySuggestion(suggestQuery.trim());
+      }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       showSuggest = false;
     }
   }
 
-  function applySuggestion(chosen: Card) {
+  function applySuggestion(chosenTitle: string) {
     if (!textareaEl) return;
     const cursorPos = textareaEl.selectionStart;
     const before = content.slice(0, suggestStartPos);
     const after = content.slice(cursorPos);
-    const inserted = `[[${chosen.title}]] `;
-    content = before + inserted + after;
+    const hasClosing = after.startsWith(']]');
+    const cleanAfter = hasClosing ? after.slice(2) : after;
+    const inserted = `[[${chosenTitle}]] `;
+    content = before + inserted + cleanAfter;
     showSuggest = false;
     save({ content });
 
@@ -262,16 +289,19 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <!-- svelte-ignore a11y_mouse_events_have_key_events -->
             <div
-              class="markdown-body min-h-64 rounded-xl border border-slate-200 bg-slate-50/60 p-4 transition hover:border-slate-300"
+              class="markdown-body min-h-64 rounded-xl border border-slate-200 bg-slate-50/60 p-4 transition hover:border-slate-300 cursor-text select-text"
               onclick={handleWikilinkClick}
+              ondblclick={() => (mode = 'edit')}
               onmouseover={handleWikilinkMouseOver}
               onmouseleave={handleWikilinkMouseLeave}
+              title="Klik dua kali untuk mengedit isi catatan"
             >
               {@html renderMarkdown(content)}
             </div>
-            <p class="mt-1.5 text-right text-[11px] text-slate-400">
-              Mendukung syntax Markdown standar &amp; wikilinks <code>[[Nama Kartu]]</code>
-            </p>
+            <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Klik dua kali untuk mengedit</span>
+              <span>Mendukung syntax Markdown &amp; wikilinks <code>[[Nama Catatan]]</code></span>
+            </div>
           {:else}
             <div class="relative space-y-1.5">
               <textarea
@@ -287,36 +317,70 @@
               ></textarea>
 
               <!-- Dropdown Saran Wikilink [[ (Obsidian Autocomplete) -->
-              {#if showSuggest && suggestCards.length > 0}
+              {#if showSuggest && (suggestCards.length > 0 || canCreateNew)}
                 <div
-                  class="absolute left-2 right-2 bottom-12 z-20 max-h-48 overflow-y-auto rounded-xl border border-brand-200 bg-white p-1.5 shadow-xl animate-in fade-in-0 duration-100"
+                  bind:this={suggestContainerEl}
+                  class="absolute left-2 right-2 bottom-12 z-30 max-h-56 overflow-y-auto rounded-xl border border-indigo-200 bg-white/95 p-1.5 shadow-2xl backdrop-blur-md animate-in fade-in-0 duration-100"
                 >
-                  <div class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                    <span>Saran Tautan [[ ({suggestQuery || 'Semua'})</span>
-                    <span class="font-normal lowercase">Enter/Tab untuk memilih</span>
+                  <div class="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between border-b border-slate-100 mb-1">
+                    <span class="flex items-center gap-1.5 text-indigo-600">
+                      <span>Tautkan Catatan [[</span>
+                      {#if suggestQuery}
+                        <span class="font-mono text-slate-700 bg-slate-100 px-1 rounded lowercase">{suggestQuery}</span>
+                      {/if}
+                    </span>
+                    <span class="font-normal lowercase text-slate-400">&uarr;&darr; navigasi &bull; Enter pilih</span>
                   </div>
+
                   {#each suggestCards as item, idx (item.id)}
+                    {@const isActive = suggestIndex === idx}
                     <button
                       type="button"
+                      data-active={isActive}
                       onmousedown={(e) => {
                         e.preventDefault();
-                        applySuggestion(item);
+                        applySuggestion(item.title);
                       }}
                       onmouseenter={() => (suggestIndex = idx)}
-                      class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition cursor-pointer {suggestIndex === idx
-                        ? 'bg-brand-600 text-white'
+                      class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition cursor-pointer {isActive
+                        ? 'bg-indigo-600 text-white shadow-sm'
                         : 'text-slate-800 hover:bg-slate-100'}"
                     >
-                      <span class="font-medium truncate">[[{item.title}]]</span>
+                      <div class="flex items-center gap-2 min-w-0">
+                        <FileText class="size-3.5 shrink-0 {isActive ? 'text-indigo-200' : 'text-slate-400'}" />
+                        <span class="font-medium truncate">[[{item.title}]]</span>
+                      </div>
                       <span
-                        class="rounded px-1.5 py-0.2 text-[10px] shrink-0 {suggestIndex === idx
-                          ? 'bg-brand-700/60 text-white'
+                        class="rounded px-1.5 py-0.5 text-[10px] shrink-0 font-medium {isActive
+                          ? 'bg-indigo-700 text-white'
                           : 'bg-slate-100 text-slate-500'}"
                       >
                         {store.lists.find((l) => l.id === item.list_id)?.title ?? 'List'}
                       </span>
                     </button>
                   {/each}
+
+                  {#if canCreateNew}
+                    {@const isNewActive = suggestIndex === suggestCards.length}
+                    <button
+                      type="button"
+                      data-active={isNewActive}
+                      onmousedown={(e) => {
+                        e.preventDefault();
+                        applySuggestion(suggestQuery.trim());
+                      }}
+                      onmouseenter={() => (suggestIndex = suggestCards.length)}
+                      class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition cursor-pointer mt-0.5 border-t border-slate-100 {isNewActive
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-700 hover:bg-slate-100'}"
+                    >
+                      <div class="flex items-center gap-2 min-w-0">
+                        <Plus class="size-3.5 shrink-0 {isNewActive ? 'text-white' : 'text-indigo-600'}" />
+                        <span class="truncate">Buat tautan baru: <strong>[[{suggestQuery.trim()}]]</strong></span>
+                      </div>
+                      <span class="text-[10px] opacity-75 shrink-0">Enter &crarr;</span>
+                    </button>
+                  {/if}
                 </div>
               {/if}
 
