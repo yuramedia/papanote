@@ -80,67 +80,77 @@
 
 <div class="flex h-full flex-col bg-gradient-to-br from-brand-700 via-brand-800 to-slate-900">
   <TopBar title={store.board?.title ?? ''}>
-    <div class="flex items-center rounded-xl bg-white/10 p-1 text-xs">
+    {#snippet leftControls()}
+      <div class="flex items-center rounded-xl bg-white/10 p-1 text-xs">
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'kanban'
+            ? 'bg-white text-slate-900 shadow-sm'
+            : 'text-white/70 hover:text-white'}"
+          onclick={() => (viewMode = 'kanban')}
+          title="Tampilan Kanban Board"
+        >
+          <Kanban class="size-3.5" />
+          <span class="hidden sm:inline">Kanban</span>
+        </button>
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'graph'
+            ? 'bg-indigo-600 text-white shadow-sm'
+            : 'text-white/70 hover:text-white'}"
+          onclick={() => (viewMode = 'graph')}
+          title="Tampilan Obsidian Graph View"
+        >
+          <Network class="size-3.5" />
+          <span class="hidden sm:inline">Graph</span>
+        </button>
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'canvas'
+            ? 'bg-indigo-600 text-white shadow-sm'
+            : 'text-white/70 hover:text-white'}"
+          onclick={() => (viewMode = 'canvas')}
+          title="Tampilan Obsidian Infinite Canvas"
+        >
+          <Layers class="size-3.5" />
+          <span class="hidden sm:inline">Canvas</span>
+        </button>
+      </div>
+    {/snippet}
+
+    {#snippet center()}
       <button
         type="button"
-        class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'kanban'
-          ? 'bg-white text-slate-900 shadow-sm'
-          : 'text-white/70 hover:text-white'}"
-        onclick={() => (viewMode = 'kanban')}
-        title="Tampilan Kanban Board"
+        class="flex w-full max-w-xs md:max-w-sm items-center justify-between rounded-xl bg-white/10 hover:bg-white/15 px-3.5 py-1.5 text-xs text-white/60 hover:text-white border border-white/10 transition-colors cursor-pointer shadow-inner"
+        onclick={() => (openQuickSwitcher = true)}
+        title="Pencarian Cepat Catatan (Ctrl + O / Ctrl + K)"
       >
-        <Kanban class="size-3.5" />
-        <span class="hidden sm:inline">Kanban</span>
+        <span class="flex items-center gap-2 truncate">
+          <Search class="size-3.5 text-indigo-300 shrink-0" />
+          <span class="truncate">Cari catatan...</span>
+        </span>
+        <kbd class="font-mono bg-white/15 px-1.5 py-0.5 rounded text-[10px] text-white/80 shrink-0">Ctrl+O</kbd>
       </button>
-      <button
-        type="button"
-        class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'graph'
-          ? 'bg-indigo-600 text-white shadow-sm'
-          : 'text-white/70 hover:text-white'}"
-        onclick={() => (viewMode = 'graph')}
-        title="Tampilan Obsidian Graph View"
+    {/snippet}
+
+    {#snippet rightStatus()}
+      <span
+        class="hidden items-center gap-1 rounded-full px-2 py-0.5 text-xs sm:inline-flex {store.connected
+          ? 'bg-emerald-500/20 text-emerald-300'
+          : 'bg-white/10 text-white/60'}"
+        title={store.connected ? 'Tersambung realtime' : 'Menyambungkan…'}
       >
-        <Network class="size-3.5" />
-        <span class="hidden sm:inline">Graph</span>
-      </button>
-      <button
-        type="button"
-        class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'canvas'
-          ? 'bg-indigo-600 text-white shadow-sm'
-          : 'text-white/70 hover:text-white'}"
-        onclick={() => (viewMode = 'canvas')}
-        title="Tampilan Obsidian Infinite Canvas"
-      >
-        <Layers class="size-3.5" />
-        <span class="hidden sm:inline">Canvas</span>
-      </button>
-    </div>
+        {#if store.connected}<Wifi class="size-3" /> Live{:else}<WifiOff class="size-3" /> Offline{/if}
+      </span>
+    {/snippet}
 
     <button
-      type="button"
-      class="btn bg-white/10 text-white hover:bg-white/20 text-xs flex items-center gap-1.5"
-      onclick={() => (openQuickSwitcher = true)}
-      title="Cari Catatan Cepat (Ctrl + O / Ctrl + K)"
-    >
-      <Search class="size-3.5 text-indigo-300" />
-      <span class="hidden md:inline">Cari (Ctrl+O)</span>
-    </button>
-
-    <span
-      class="hidden items-center gap-1 rounded-full px-2 py-0.5 text-xs sm:inline-flex {store.connected
-        ? 'bg-emerald-500/20 text-emerald-300'
-        : 'bg-white/10 text-white/60'}"
-      title={store.connected ? 'Tersambung realtime' : 'Menyambungkan…'}
-    >
-      {#if store.connected}<Wifi class="size-3" /> Live{:else}<WifiOff class="size-3" /> Offline{/if}
-    </span>
-    <button
-      class="btn bg-white/10 text-white hover:bg-white/20"
+      class="btn bg-white/10 text-white hover:bg-white/20 text-xs py-1.5 px-3"
       onclick={exportDocx}
       disabled={exporting || !store.board}
     >
       {#if exporting}<LoaderCircle class="size-4 animate-spin" />{:else}<FileDown class="size-4" />{/if}
-      <span class="hidden sm:inline">Ekspor Word</span>
+      <span class="hidden md:inline">Ekspor Word</span>
     </button>
   </TopBar>
 
