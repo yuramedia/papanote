@@ -135,6 +135,85 @@
     path: string;
   }
 
+  /**
+   * Menghitung jalur kurva SVG cerdas 4 arah (Top, Bottom, Left, Right).
+   * Mendukung koneksi vertikal (atas-bawah) dan horizontal (samping) secara otomatis
+   * berdasarkan orientasi posisi relatif antara kartu asal dan tujuan.
+   */
+  function computeConnectionPath(
+    srcPos: { x: number; y: number },
+    tgtPos: { x: number; y: number }
+  ): string {
+    const srcCenter = { x: srcPos.x + CARD_WIDTH / 2, y: srcPos.y + CARD_HEIGHT / 2 };
+    const tgtCenter = { x: tgtPos.x + CARD_WIDTH / 2, y: tgtPos.y + CARD_HEIGHT / 2 };
+
+    const dx = tgtCenter.x - srcCenter.x;
+    const dy = tgtCenter.y - srcCenter.y;
+
+    // Pertimbangkan aspek rasio kartu (lebar 260px > tinggi 150px = ~1.73)
+    // Beri bobot vertikal agar kartu yang berada di atas/bawah otomatis memakai anchor vertikal
+    const isVerticalDominant = Math.abs(dy) * 1.45 > Math.abs(dx);
+
+    let x1: number, y1: number, x2: number, y2: number;
+    let cp1x: number, cp1y: number, cp2x: number, cp2y: number;
+
+    if (isVerticalDominant) {
+      if (dy > 0) {
+        // Target berada di BAWAH: keluar dari SISI BAWAH source, masuk ke SISI ATAS target
+        x1 = srcCenter.x;
+        y1 = srcPos.y + CARD_HEIGHT;
+        x2 = tgtCenter.x;
+        y2 = tgtPos.y;
+
+        const curveDist = Math.max(30, Math.abs(y2 - y1) * 0.5);
+        cp1x = x1;
+        cp1y = y1 + curveDist;
+        cp2x = x2;
+        cp2y = y2 - curveDist;
+      } else {
+        // Target berada di ATAS: keluar dari SISI ATAS source, masuk ke SISI BAWAH target
+        x1 = srcCenter.x;
+        y1 = srcPos.y;
+        x2 = tgtCenter.x;
+        y2 = tgtPos.y + CARD_HEIGHT;
+
+        const curveDist = Math.max(30, Math.abs(y1 - y2) * 0.5);
+        cp1x = x1;
+        cp1y = y1 - curveDist;
+        cp2x = x2;
+        cp2y = y2 + curveDist;
+      }
+    } else {
+      if (dx > 0) {
+        // Target berada di KANAN: keluar dari SISI KANAN source, masuk ke SISI KIRI target
+        x1 = srcPos.x + CARD_WIDTH;
+        y1 = srcCenter.y;
+        x2 = tgtPos.x;
+        y2 = tgtCenter.y;
+
+        const curveDist = Math.max(30, Math.abs(x2 - x1) * 0.5);
+        cp1x = x1 + curveDist;
+        cp1y = y1;
+        cp2x = x2 - curveDist;
+        cp2y = y2;
+      } else {
+        // Target berada di KIRI: keluar dari SISI KIRI source, masuk ke SISI KANAN target
+        x1 = srcPos.x;
+        y1 = srcCenter.y;
+        x2 = tgtPos.x + CARD_WIDTH;
+        y2 = tgtCenter.y;
+
+        const curveDist = Math.max(30, Math.abs(x1 - x2) * 0.5);
+        cp1x = x1 - curveDist;
+        cp1y = y1;
+        cp2x = x2 + curveDist;
+        cp2y = y2;
+      }
+    }
+
+    return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
+  }
+
   const connections = $derived.by<CanvasConnection[]>(() => {
     const activeCards = store.cards.filter((c) => !c.deleted_at);
     const cardMap = new Map<string, Card>();
@@ -161,28 +240,10 @@
           const tgtPos = positions[targetCard.id];
           if (!tgtPos) continue;
 
-          // Hitung titik penghubung antar dua kartu
-          const srcCenter = { x: srcPos.x + CARD_WIDTH / 2, y: srcPos.y + CARD_HEIGHT / 2 };
-          const tgtCenter = { x: tgtPos.x + CARD_WIDTH / 2, y: tgtPos.y + CARD_HEIGHT / 2 };
-
-          // Titik anchor: dari sisi kanan/kiri kartu tergantung posisi
-          let x1 = srcPos.x + CARD_WIDTH;
-          let y1 = srcCenter.y;
-          let x2 = tgtPos.x;
-          let y2 = tgtCenter.y;
-
-          if (tgtCenter.x < srcCenter.x) {
-            x1 = srcPos.x;
-            x2 = tgtPos.x + CARD_WIDTH;
-          }
-
-          const dx = Math.abs(x2 - x1) * 0.5;
-          const path = `M ${x1} ${y1} C ${x1 + (x2 > x1 ? dx : -dx)} ${y1}, ${x2 + (x2 > x1 ? -dx : dx)} ${y2}, ${x2} ${y2}`;
-
           conns.push({
             sourceId: card.id,
             targetId: targetCard.id,
-            path,
+            path: computeConnectionPath(srcPos, tgtPos),
           });
         }
       }
@@ -351,7 +412,7 @@
         <marker
           id="canvas-arrow"
           viewBox="0 0 10 10"
-          refX="6"
+          refX="8"
           refY="5"
           markerWidth="6"
           markerHeight="6"
