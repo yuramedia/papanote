@@ -9,8 +9,11 @@
   import Kanban from '@lucide/svelte/icons/kanban';
   import Network from '@lucide/svelte/icons/network';
   import Layers from '@lucide/svelte/icons/layers';
-  import Search from '@lucide/svelte/icons/search';
   import FileText from '@lucide/svelte/icons/file-text';
+  import Globe from '@lucide/svelte/icons/globe';
+  import Lock from '@lucide/svelte/icons/lock';
+  import Users from '@lucide/svelte/icons/users';
+  import Search from '@lucide/svelte/icons/search';
   import TopBar from '../components/TopBar.svelte';
   import ListColumn from '../components/ListColumn.svelte';
   import CardDialog from '../components/CardDialog.svelte';
@@ -18,11 +21,15 @@
   import GraphView from '../components/GraphView.svelte';
   import CanvasView from '../components/CanvasView.svelte';
   import NotesDocView from '../components/NotesDocView.svelte';
+  import BoardVisibilityDialog from '../components/BoardVisibilityDialog.svelte';
   import QuickSwitcherModal from '../components/QuickSwitcherModal.svelte';
   import { BoardStore } from '../lib/board.svelte';
+  import { supabase } from '../lib/supabase';
+  import { auth } from '../lib/auth.svelte';
   import { router } from '../lib/router.svelte';
   import { toast } from '../lib/toast.svelte';
-  import type { List } from '../lib/types';
+  import { canAccessBoard, canManageBoardVisibility } from '../lib/board-access';
+  import type { BoardVisibility, List } from '../lib/types';
 
   let { boardId, cardId }: { boardId: string; cardId?: string } = $props();
 
@@ -34,8 +41,23 @@
   let exporting = $state(false);
   let listToDelete = $state<List | null>(null);
   let confirmOpen = $state(false);
+  let visibilityOpen = $state(false);
 
   const openCard = $derived(cardId ? store.findCard(cardId) : undefined);
+
+  async function updateBoardVisibility(
+    boardId: string,
+    patch: { visibility: BoardVisibility; member_ids: string[] }
+  ) {
+    if (!store.board) return;
+    const before = { ...store.board };
+    store.board = { ...store.board, ...patch, updated_at: new Date().toISOString() };
+    const { error } = await supabase().from('boards').update(patch).eq('id', boardId);
+    if (error) {
+      store.board = before;
+      throw new Error(error.message);
+    }
+  }
 
   function handleGlobalKeyDown(e: KeyboardEvent) {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'o' || e.key === 'k')) {
@@ -157,6 +179,26 @@
       </span>
     {/snippet}
 
+    {#if store.board}
+      <button
+        type="button"
+        class="btn bg-white/10 hover:bg-white/20 text-white text-xs py-1.5 px-2.5 flex items-center gap-1.5 cursor-pointer"
+        onclick={() => (visibilityOpen = true)}
+        title={canManageBoardVisibility(store.board, auth.user, auth.isAdmin) ? 'Ubah hak akses & visibilitas papan' : 'Status visibilitas papan'}
+      >
+        {#if store.board.visibility === 'private'}
+          <Lock class="size-3.5 text-amber-300" />
+          <span class="hidden md:inline">Pribadi</span>
+        {:else if store.board.visibility === 'members'}
+          <Users class="size-3.5 text-indigo-300" />
+          <span class="hidden md:inline">{store.board.member_ids?.length || 1} Anggota</span>
+        {:else}
+          <Globe class="size-3.5 text-emerald-300" />
+          <span class="hidden md:inline">Semua Tim</span>
+        {/if}
+      </button>
+    {/if}
+
     <button
       class="btn bg-white/10 text-white hover:bg-white/20 text-xs py-1.5 px-3"
       onclick={exportDocx}
@@ -177,6 +219,21 @@
         <p class="font-medium">{store.error}</p>
         <button class="btn mt-4 bg-white/15 text-white hover:bg-white/25" onclick={() => router.go('/')}>
           <ChevronLeft class="size-4" /> Kembali ke daftar papan
+        </button>
+      </div>
+    </div>
+  {:else if store.board && !canAccessBoard(store.board, auth.user, auth.isAdmin)}
+    <div class="grid flex-1 place-items-center p-6 text-center text-white">
+      <div class="max-w-md rounded-2xl bg-white/10 p-8 shadow-2xl backdrop-blur-md border border-white/10">
+        <div class="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-amber-500/20 text-amber-300">
+          <Lock class="size-6" />
+        </div>
+        <h2 class="text-xl font-bold">Akses Papan Dibatasi</h2>
+        <p class="mt-2 text-sm text-white/70 leading-relaxed">
+          Papan ini bersifat {store.board.visibility === 'private' ? 'Pribadi' : 'Terbatas'}. Anda belum memiliki izin akses dari pemilik papan.
+        </p>
+        <button class="btn mt-6 bg-white/20 text-white hover:bg-white/30" onclick={() => router.go('/')}>
+          <ChevronLeft class="size-4" /> Kembali ke Daftar Papan
         </button>
       </div>
     </div>
@@ -228,6 +285,12 @@
 {/if}
 
 <QuickSwitcherModal bind:open={openQuickSwitcher} {store} onselect={openCardById} />
+
+<BoardVisibilityDialog
+  bind:open={visibilityOpen}
+  board={store.board}
+  onsave={updateBoardVisibility}
+/>
 
 <ConfirmDialog
   bind:open={confirmOpen}

@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS boards (
   id UUID PRIMARY KEY,
   title TEXT NOT NULL,
   position DOUBLE PRECISION NOT NULL,
+  visibility TEXT NOT NULL DEFAULT 'public',
+  member_ids TEXT[] DEFAULT '{}',
   created_by UUID,
   deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,

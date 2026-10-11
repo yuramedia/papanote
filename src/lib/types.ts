@@ -1,7 +1,11 @@
+export type BoardVisibility = 'public' | 'private' | 'members';
+
 export interface Board {
   id: string;
   title: string;
   position: number;
+  visibility?: BoardVisibility;
+  member_ids?: string[];
   created_by: string | null;
   deleted_at: string | null;
   created_at: string;
