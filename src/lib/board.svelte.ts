@@ -153,7 +153,7 @@ export class BoardStore {
 
   // ---------- Cards ----------
 
-  async addCard(listId: string, title: string) {
+  async addCard(listId: string, title: string): Promise<Card | null> {
     const last = this.cardsFor(listId).at(-1);
     const userId = auth.user?.id ?? null;
     const card: Card = {
@@ -182,7 +182,9 @@ export class BoardStore {
     if (error) {
       this.cards = this.cards.filter((c) => c.id !== card.id);
       toast.error(`Gagal membuat kartu: ${error.message}`);
+      return null;
     }
+    return card;
   }
 
   async updateCard(

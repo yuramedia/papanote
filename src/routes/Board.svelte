@@ -10,12 +10,14 @@
   import Network from '@lucide/svelte/icons/network';
   import Layers from '@lucide/svelte/icons/layers';
   import Search from '@lucide/svelte/icons/search';
+  import FileText from '@lucide/svelte/icons/file-text';
   import TopBar from '../components/TopBar.svelte';
   import ListColumn from '../components/ListColumn.svelte';
   import CardDialog from '../components/CardDialog.svelte';
   import ConfirmDialog from '../components/ConfirmDialog.svelte';
   import GraphView from '../components/GraphView.svelte';
   import CanvasView from '../components/CanvasView.svelte';
+  import NotesDocView from '../components/NotesDocView.svelte';
   import QuickSwitcherModal from '../components/QuickSwitcherModal.svelte';
   import { BoardStore } from '../lib/board.svelte';
   import { router } from '../lib/router.svelte';
@@ -26,7 +28,7 @@
 
   // svelte-ignore state_referenced_locally — komponen di-key per boardId di App.svelte
   const store = new BoardStore(boardId);
-  let viewMode = $state<'kanban' | 'graph' | 'canvas'>('kanban');
+  let viewMode = $state<'notes' | 'kanban' | 'graph' | 'canvas'>('kanban');
   let openQuickSwitcher = $state(false);
   let newList = $state('');
   let exporting = $state(false);
@@ -82,6 +84,17 @@
   <TopBar title={store.board?.title ?? ''}>
     {#snippet leftControls()}
       <div class="flex items-center rounded-xl bg-white/10 p-1 text-xs">
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'notes'
+            ? 'bg-indigo-600 text-white shadow-sm'
+            : 'text-white/70 hover:text-white'}"
+          onclick={() => (viewMode = 'notes')}
+          title="Tampilan Dokumen Workspace Ala Obsidian"
+        >
+          <FileText class="size-3.5" />
+          <span class="hidden sm:inline">Notes</span>
+        </button>
         <button
           type="button"
           class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'kanban'
@@ -195,6 +208,10 @@
         {/if}
       </form>
     </main>
+  {:else if viewMode === 'notes'}
+    <div class="flex flex-1 overflow-hidden">
+      <NotesDocView {store} onopen={openCardById} onSwitchView={(v) => (viewMode = v)} />
+    </div>
   {:else if viewMode === 'graph'}
     <div class="flex flex-1 overflow-hidden">
       <GraphView {store} onopen={openCardById} />
