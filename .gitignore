@@ -8,3 +8,5 @@ public/config.json
 *.log
 .DS_Store
 coverage/
+.agents/
+skills-lock.json

@@ -21,7 +21,7 @@
   import { byPosition, mergeRow } from '../lib/merge';
   import { positionBetween } from '../lib/fractional';
   import { formatDate } from '../lib/format';
-  import { canAccessBoard, canManageBoardVisibility } from '../lib/board-access';
+  import { canAccessBoard, canManageBoardVisibility, getUserBoardRole } from '../lib/board-access';
   import type { Board, BoardVisibility } from '../lib/types';
 
   let boards = $state<Board[]>([]);
@@ -118,7 +118,7 @@
 
   async function updateVisibility(
     boardId: string,
-    patch: { visibility: BoardVisibility; member_ids: string[] }
+    patch: { visibility: BoardVisibility; member_ids: string[]; member_roles: Record<string, 'admin' | 'user'> }
   ) {
     const before = boards.find((b) => b.id === boardId);
     boards = boards.map((b) =>
@@ -208,16 +208,37 @@
     {:else}
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {#each displayedBoards as board (board.id)}
+          {@const myRole = getUserBoardRole(board, auth.user, auth.isAdmin)}
           <div
             class="group relative flex h-28 flex-col justify-between rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-4 text-white shadow-sm transition hover:shadow-lg"
           >
             <div class="flex items-start gap-2">
-              <InlineEdit
-                value={board.title}
-                class="min-w-0 flex-1 text-lg font-semibold"
-                inputClass="text-slate-900"
-                onsave={(title) => update(board.id, { title })}
-              />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 truncate">
+                  <InlineEdit
+                    value={board.title}
+                    class="min-w-0 font-semibold text-lg truncate"
+                    inputClass="text-slate-900"
+                    onsave={(title) => update(board.id, { title })}
+                  />
+                  <span
+                    class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.2 text-[10px] font-semibold shrink-0 {myRole === 'owner'
+                      ? 'bg-purple-400/30 text-purple-100 ring-1 ring-purple-300/30'
+                      : myRole === 'admin'
+                        ? 'bg-amber-400/30 text-amber-100 ring-1 ring-amber-300/30'
+                        : 'bg-white/15 text-white/80'}"
+                    title={`Peran Anda di papan ini: ${myRole}`}
+                  >
+                    {#if myRole === 'owner'}
+                      👑 Owner
+                    {:else if myRole === 'admin'}
+                      🛡️ Admin
+                    {:else}
+                      👤 User
+                    {/if}
+                  </span>
+                </div>
+              </div>
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger class="rounded-md p-1 text-white/70 hover:bg-white/15 hover:text-white cursor-pointer">
                   <Ellipsis class="size-4" />

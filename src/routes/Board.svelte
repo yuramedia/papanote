@@ -28,7 +28,7 @@
   import { auth } from '../lib/auth.svelte';
   import { router } from '../lib/router.svelte';
   import { toast } from '../lib/toast.svelte';
-  import { canAccessBoard, canManageBoardVisibility } from '../lib/board-access';
+  import { canAccessBoard, canManageBoardVisibility, getUserBoardRole } from '../lib/board-access';
   import type { BoardVisibility, List } from '../lib/types';
 
   let { boardId, cardId }: { boardId: string; cardId?: string } = $props();
@@ -47,7 +47,7 @@
 
   async function updateBoardVisibility(
     boardId: string,
-    patch: { visibility: BoardVisibility; member_ids: string[] }
+    patch: { visibility: BoardVisibility; member_ids: string[]; member_roles: Record<string, 'admin' | 'user'> }
   ) {
     if (!store.board) return;
     const before = { ...store.board };
@@ -180,6 +180,7 @@
     {/snippet}
 
     {#if store.board}
+      {@const myBoardRole = getUserBoardRole(store.board, auth.user, auth.isAdmin)}
       <button
         type="button"
         class="btn bg-white/10 hover:bg-white/20 text-white text-xs py-1.5 px-2.5 flex items-center gap-1.5 cursor-pointer"
@@ -196,6 +197,22 @@
           <Globe class="size-3.5 text-emerald-300" />
           <span class="hidden md:inline">Semua Tim</span>
         {/if}
+        <span
+          class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.2 text-[10px] font-semibold {myBoardRole === 'owner'
+            ? 'bg-purple-400/30 text-purple-200 ring-1 ring-purple-300/30'
+            : myBoardRole === 'admin'
+              ? 'bg-amber-400/30 text-amber-200 ring-1 ring-amber-300/30'
+              : 'bg-white/15 text-white/90'}"
+          title={`Peran Anda di papan ini: ${myBoardRole}`}
+        >
+          {#if myBoardRole === 'owner'}
+            👑 Owner
+          {:else if myBoardRole === 'admin'}
+            🛡️ Admin
+          {:else}
+            👤 User
+          {/if}
+        </span>
       </button>
     {/if}
 

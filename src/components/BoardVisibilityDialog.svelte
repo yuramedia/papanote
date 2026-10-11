@@ -22,7 +22,10 @@
   }: {
     board: Board | null;
     open?: boolean;
-    onsave: (boardId: string, patch: { visibility: BoardVisibility; member_ids: string[] }) => Promise<void>;
+    onsave: (
+      boardId: string,
+      patch: { visibility: BoardVisibility; member_ids: string[]; member_roles: Record<string, 'admin' | 'user'> }
+    ) => Promise<void>;
   } = $props();
 
   interface TeamMember {
@@ -32,6 +35,7 @@
 
   let selectedVisibility = $state<BoardVisibility>('public');
   let selectedMembers = $state<string[]>([]);
+  let selectedRoles = $state<Record<string, 'admin' | 'user'>>({});
   let teamMembers = $state<TeamMember[]>([]);
   let loadingMembers = $state(false);
   let memberSearch = $state('');
@@ -43,6 +47,7 @@
     if (open && board) {
       selectedVisibility = board.visibility || 'public';
       selectedMembers = Array.isArray(board.member_ids) ? [...board.member_ids] : [];
+      selectedRoles = board.member_roles ? { ...board.member_roles } : {};
       memberSearch = '';
       loadTeamMembers();
     }
@@ -52,12 +57,10 @@
     loadingMembers = true;
     loadError = null;
     try {
-      // Coba panggil get_team_members RPC (bisa diakses semua authenticated user)
       const { data, error } = await supabase().rpc('get_team_members');
       if (!error && data && Array.isArray(data)) {
         teamMembers = data as TeamMember[];
       } else {
-        // Fallback jika get_team_members belum dibuat: coba admin_list_users (jika user admin)
         if (auth.isAdmin) {
           const { data: adminData, error: adminErr } = await supabase().rpc('admin_list_users');
           if (!adminErr && adminData) {
@@ -69,7 +72,6 @@
           }
         }
 
-        // Jika fungsi RPC belum di-deploy di Supabase, set fallback default dengan pengguna saat ini
         if (auth.user) {
           teamMembers = [{ id: auth.user.id, email: auth.user.email ?? 'Anda' }];
         }
@@ -92,9 +94,19 @@
   function toggleMember(memberIdOrEmail: string) {
     if (selectedMembers.includes(memberIdOrEmail)) {
       selectedMembers = selectedMembers.filter((id) => id !== memberIdOrEmail);
+      const copy = { ...selectedRoles };
+      delete copy[memberIdOrEmail];
+      selectedRoles = copy;
     } else {
       selectedMembers = [...selectedMembers, memberIdOrEmail];
+      if (!selectedRoles[memberIdOrEmail]) {
+        selectedRoles = { ...selectedRoles, [memberIdOrEmail]: 'user' };
+      }
     }
+  }
+
+  function setMemberRole(memberId: string, role: 'admin' | 'user') {
+    selectedRoles = { ...selectedRoles, [memberId]: role };
   }
 
   async function handleSave() {
@@ -111,9 +123,10 @@
       await onsave(board.id, {
         visibility: selectedVisibility,
         member_ids: selectedVisibility === 'members' ? finalMembers : [],
+        member_roles: selectedVisibility === 'members' ? selectedRoles : {},
       });
       open = false;
-      toast.success('Pengaturan visibilitas papan berhasil disimpan.');
+      toast.success('Pengaturan hak akses papan berhasil disimpan.');
     } catch (err) {
       toast.error('Gagal menyimpan visibilitas: ' + (err as Error).message);
     } finally {
@@ -264,12 +277,12 @@
                 {@const isOwner = board?.created_by === member.id}
                 {@const isSelected = isOwner || selectedMembers.includes(member.id) || selectedMembers.includes(member.email.toLowerCase())}
 
-                <label
-                  class="flex items-center justify-between rounded-lg px-2.5 py-1.5 transition cursor-pointer {isSelected
-                    ? 'bg-indigo-100/70 text-slate-900 font-medium'
-                    : 'hover:bg-slate-200/60 text-slate-700'}"
+                <div
+                  class="flex items-center justify-between rounded-lg px-2.5 py-1.5 transition {isSelected
+                    ? 'bg-indigo-50/90 text-slate-900 font-medium'
+                    : 'hover:bg-slate-100 text-slate-700'}"
                 >
-                  <div class="flex items-center gap-2 truncate">
+                  <label class="flex items-center gap-2 truncate cursor-pointer flex-1 mr-2 select-none">
                     <input
                       type="checkbox"
                       checked={isSelected}
@@ -278,18 +291,30 @@
                       class="size-3.5 text-indigo-600 accent-indigo-600 rounded cursor-pointer disabled:opacity-50"
                     />
                     <span class="text-xs truncate">{member.email}</span>
-                  </div>
+                  </label>
 
                   {#if isOwner}
-                    <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 shrink-0">
-                      Pemilik
+                    <span class="inline-flex items-center gap-1 rounded bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700 shrink-0">
+                      👑 Owner
                     </span>
                   {:else if isSelected}
-                    <span class="text-[10px] text-indigo-600 shrink-0 font-medium">
-                      Akses Diberikan
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <select
+                        value={selectedRoles[member.id] || selectedRoles[member.email.toLowerCase()] || 'user'}
+                        onchange={(e) => setMemberRole(member.id, e.currentTarget.value as 'admin' | 'user')}
+                        class="rounded border border-indigo-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-2xs focus:border-indigo-500 focus:outline-none cursor-pointer"
+                        title="Peran anggota di papan ini"
+                      >
+                        <option value="admin">🛡️ Admin</option>
+                        <option value="user">👤 User</option>
+                      </select>
+                    </div>
+                  {:else}
+                    <span class="text-[10px] text-slate-400 shrink-0">
+                      Tidak ada akses
                     </span>
                   {/if}
-                </label>
+                </div>
               {/each}
             {/if}
           </div>

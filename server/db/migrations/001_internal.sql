@@ -10,12 +10,14 @@ CREATE TABLE IF NOT EXISTS boards (
   position DOUBLE PRECISION NOT NULL,
   visibility TEXT NOT NULL DEFAULT 'public',
   member_ids TEXT[] DEFAULT '{}',
+  member_roles JSONB DEFAULT '{}',
   created_by UUID,
   deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
   synced_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE boards ADD COLUMN IF NOT EXISTS member_roles JSONB DEFAULT '{}';
 
 CREATE TABLE IF NOT EXISTS lists (
   id UUID PRIMARY KEY,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { canAccessBoard, canManageBoardVisibility, getVisibilityLabel } from '../src/lib/board-access';
+import { canAccessBoard, canManageBoardVisibility, getRoleBadgeInfo, getUserBoardRole, getVisibilityLabel } from '../src/lib/board-access';
 import type { Board } from '../src/lib/types';
 import type { User } from '@supabase/supabase-js';
 
@@ -122,3 +122,53 @@ describe('getVisibilityLabel', () => {
     expect(getVisibilityLabel('members')).toBe('Anggota Terpilih');
   });
 });
+
+describe('getUserBoardRole (Peran 3-Tier: owner, admin, user)', () => {
+  const board = createTestBoard({
+    created_by: 'user-1',
+    member_roles: {
+      'user-2': 'admin',
+      'charlie@yuramedia.com': 'user',
+    },
+  });
+
+  test('pembuat papan selalu mendapat role owner', () => {
+    expect(getUserBoardRole(board, userAlice, false)).toBe('owner');
+  });
+
+  test('admin global selalu bertindak sebagai role admin', () => {
+    const userAdmin = mockUser('user-99', 'admin@yuramedia.com');
+    expect(getUserBoardRole(board, userAdmin, true)).toBe('admin');
+  });
+
+  test('anggota yang ditugaskan sebagai admin di papan mendapat role admin', () => {
+    expect(getUserBoardRole(board, userBob, false)).toBe('admin');
+  });
+
+  test('anggota yang ditugaskan sebagai user di papan mendapat role user', () => {
+    expect(getUserBoardRole(board, userCharlie, false)).toBe('user');
+  });
+
+  test('pengguna lain atau tanpa login default ke user', () => {
+    const userDave = mockUser('user-4', 'dave@yuramedia.com');
+    expect(getUserBoardRole(board, userDave, false)).toBe('user');
+    expect(getUserBoardRole(board, null, false)).toBe('user');
+  });
+});
+
+describe('getRoleBadgeInfo', () => {
+  test('mengembalikan icon dan label yang benar untuk setiap role', () => {
+    const ownerBadge = getRoleBadgeInfo('owner');
+    expect(ownerBadge.label).toBe('Owner');
+    expect(ownerBadge.icon).toBe('👑');
+
+    const adminBadge = getRoleBadgeInfo('admin');
+    expect(adminBadge.label).toBe('Admin');
+    expect(adminBadge.icon).toBe('🛡️');
+
+    const userBadge = getRoleBadgeInfo('user');
+    expect(userBadge.label).toBe('User');
+    expect(userBadge.icon).toBe('👤');
+  });
+});
+

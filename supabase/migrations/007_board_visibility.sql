@@ -6,9 +6,10 @@
 -- Jalankan file ini di Supabase Dashboard → SQL Editor.
 -- =====================================================================
 
--- 1. Tambah kolom visibility dan member_ids ke tabel boards jika belum ada
+-- 1. Tambah kolom visibility, member_ids, dan member_roles ke tabel boards jika belum ada
 ALTER TABLE boards ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public';
 ALTER TABLE boards ADD COLUMN IF NOT EXISTS member_ids TEXT[] DEFAULT '{}';
+ALTER TABLE boards ADD COLUMN IF NOT EXISTS member_roles JSONB DEFAULT '{}'::jsonb;
 
 -- 2. Tambah check constraint untuk nilai visibility yang valid
 DO $$

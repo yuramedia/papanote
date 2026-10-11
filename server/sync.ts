@@ -5,7 +5,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
  * Payload webhook tidak pernah dipercaya mentah-mentah.
  */
 export const SYNC_TABLES = {
-  boards: ['id', 'title', 'position', 'visibility', 'member_ids', 'created_by', 'deleted_at', 'created_at', 'updated_at'],
+  boards: ['id', 'title', 'position', 'visibility', 'member_ids', 'member_roles', 'created_by', 'deleted_at', 'created_at', 'updated_at'],
   lists: ['id', 'board_id', 'title', 'position', 'deleted_at', 'created_at', 'updated_at'],
   cards: [
     'id', 'list_id', 'title', 'content', 'position', 'deadline_date', 'enable_notification',

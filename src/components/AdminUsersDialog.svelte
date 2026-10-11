@@ -297,7 +297,11 @@
                       </div>
                     </td>
                     <td class="py-2.5 px-3">
-                      {#if u.is_admin}
+                      {#if u.email.toLowerCase() === 'admin@yuramedia.com'}
+                        <span class="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 ring-1 ring-purple-600/20">
+                          👑 Owner
+                        </span>
+                      {:else if u.is_admin}
                         <span class="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-600/20">
                           <ShieldCheck class="size-3" />
                           Admin
@@ -305,7 +309,7 @@
                       {:else}
                         <span class="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
                           <UserCheck class="size-3 text-slate-400" />
-                          Anggota
+                          User
                         </span>
                       {/if}
                     </td>
@@ -313,8 +317,8 @@
                       {formatDateTime(u.created_at)}
                     </td>
                     <td class="py-2.5 px-3 text-right">
-                      {#if u.email === 'admin@yuramedia.com'}
-                        <span class="text-[11px] text-slate-400 italic">Root Admin</span>
+                      {#if u.email.toLowerCase() === 'admin@yuramedia.com'}
+                        <span class="text-[11px] text-purple-600/80 font-medium italic">Owner Utama</span>
                       {:else}
                         <button
                           type="button"
@@ -323,13 +327,13 @@
                             : 'bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800'}"
                           disabled={changingRole === u.email}
                           onclick={() => handleToggleRole(u.email, u.is_admin)}
-                          title={u.is_admin ? 'Cabut hak akses admin' : 'Jadikan admin'}
+                          title={u.is_admin ? 'Cabut hak akses admin (ubah menjadi User)' : 'Jadikan admin'}
                         >
                           {#if changingRole === u.email}
                             <LoaderCircle class="size-3 animate-spin" />
                           {:else if u.is_admin}
                             <ShieldAlert class="size-3" />
-                            Cabut Admin
+                            Ubah ke User
                           {:else}
                             <ShieldCheck class="size-3" />
                             Jadikan Admin

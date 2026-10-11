@@ -1,3 +1,5 @@
+export type UserRole = 'owner' | 'admin' | 'user';
+export type BoardMemberRole = 'owner' | 'admin' | 'user';
 export type BoardVisibility = 'public' | 'private' | 'members';
 
 export interface Board {
@@ -6,6 +8,7 @@ export interface Board {
   position: number;
   visibility?: BoardVisibility;
   member_ids?: string[];
+  member_roles?: Record<string, 'admin' | 'user'>;
   created_by: string | null;
   deleted_at: string | null;
   created_at: string;

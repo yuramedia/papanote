@@ -1,11 +1,23 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import type { UserRole } from './types';
 
 class AuthStore {
   session = $state<Session | null>(null);
   ready = $state(false);
   isAdmin = $state(false);
   user = $derived<User | null>(this.session?.user ?? null);
+
+  get isOwner(): boolean {
+    return this.user?.email?.toLowerCase() === 'admin@yuramedia.com';
+  }
+
+  get role(): UserRole {
+    if (!this.session?.user) return 'user';
+    if (this.isOwner) return 'owner';
+    if (this.isAdmin) return 'admin';
+    return 'user';
+  }
 
   async checkAdmin() {
     if (!this.session) {

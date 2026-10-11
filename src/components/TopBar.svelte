@@ -68,11 +68,19 @@
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Akun Terdaftar</p>
             <p class="text-xs font-semibold text-slate-800 truncate">{auth.user?.email}</p>
             <span
-              class="inline-block mt-0.5 rounded px-1.5 py-0.2 text-[10px] font-semibold {auth.isAdmin
-                ? 'bg-amber-100 text-amber-700'
-                : 'bg-slate-100 text-slate-600'}"
+              class="inline-flex items-center gap-1 mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold {auth.role === 'owner'
+                ? 'bg-purple-100 text-purple-700'
+                : auth.role === 'admin'
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-slate-100 text-slate-600'}"
             >
-              {auth.isAdmin ? 'Admin' : 'Anggota'}
+              {#if auth.role === 'owner'}
+                👑 Owner
+              {:else if auth.role === 'admin'}
+                🛡️ Admin
+              {:else}
+                👤 User
+              {/if}
             </span>
           </div>
 
