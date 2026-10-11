@@ -17,6 +17,9 @@ class ToastStore {
   success(m: string) {
     this.show(m, 'success');
   }
+  info(m: string) {
+    this.show(m, 'info');
+  }
   error(m: string) {
     this.show(m, 'error', 6000);
   }

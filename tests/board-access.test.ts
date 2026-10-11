@@ -87,6 +87,24 @@ describe('canAccessBoard (Visibilitas Papan)', () => {
       expect(canAccessBoard(board, userCharlie, false)).toBe(true);
     });
 
+    test('anggota yang username-nya terdaftar dapat mengakses', () => {
+      const boardByUsername = createTestBoard({
+        visibility: 'members',
+        created_by: 'user-1',
+        member_ids: ['charlie'],
+      });
+      expect(canAccessBoard(boardByUsername, userCharlie, false)).toBe(true);
+    });
+
+    test('anggota yang username dengan awalan @ terdaftar dapat mengakses', () => {
+      const boardByAtUsername = createTestBoard({
+        visibility: 'members',
+        created_by: 'user-1',
+        member_ids: ['@bob'],
+      });
+      expect(canAccessBoard(boardByAtUsername, userBob, false)).toBe(true);
+    });
+
     test('anggota luar yang tidak terdaftar ditolak', () => {
       const userDave = mockUser('user-4', 'dave@yuramedia.com');
       expect(canAccessBoard(board, userDave, false)).toBe(false);
@@ -147,6 +165,18 @@ describe('getUserBoardRole (Peran 3-Tier: owner, admin, user)', () => {
 
   test('anggota yang ditugaskan sebagai user di papan mendapat role user', () => {
     expect(getUserBoardRole(board, userCharlie, false)).toBe('user');
+  });
+
+  test('anggota yang perannya ditugaskan via username atau @username terbaca dengan benar', () => {
+    const boardByUsername = createTestBoard({
+      created_by: 'user-1',
+      member_roles: {
+        'bob': 'admin',
+        '@charlie': 'admin',
+      },
+    });
+    expect(getUserBoardRole(boardByUsername, userBob, false)).toBe('admin');
+    expect(getUserBoardRole(boardByUsername, userCharlie, false)).toBe('admin');
   });
 
   test('pengguna lain atau tanpa login default ke user', () => {

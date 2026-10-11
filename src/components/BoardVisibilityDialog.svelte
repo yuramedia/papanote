@@ -10,6 +10,7 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import AlertCircle from '@lucide/svelte/icons/alert-circle';
   import UserCheck from '@lucide/svelte/icons/user-check';
+  import UserPlus from '@lucide/svelte/icons/user-plus';
   import { supabase } from '../lib/supabase';
   import { auth } from '../lib/auth.svelte';
   import { toast } from '../lib/toast.svelte';
@@ -31,6 +32,7 @@
   interface TeamMember {
     id: string;
     email: string;
+    username?: string;
   }
 
   let selectedVisibility = $state<BoardVisibility>('public');
@@ -59,54 +61,158 @@
     try {
       const { data, error } = await supabase().rpc('get_team_members');
       if (!error && data && Array.isArray(data)) {
-        teamMembers = data as TeamMember[];
+        teamMembers = (data as TeamMember[]).map((u) => ({
+          id: u.id,
+          email: u.email,
+          username: u.username || (u.email ? u.email.split('@')[0] : ''),
+        }));
       } else {
         if (auth.isAdmin) {
           const { data: adminData, error: adminErr } = await supabase().rpc('admin_list_users');
           if (!adminErr && adminData) {
-            teamMembers = (adminData as { id: string; email: string }[]).map((u) => ({
+            teamMembers = (adminData as { id: string; email: string; username?: string }[]).map((u) => ({
               id: u.id,
               email: u.email,
+              username: u.username || (u.email ? u.email.split('@')[0] : ''),
             }));
             return;
           }
         }
 
         if (auth.user) {
-          teamMembers = [{ id: auth.user.id, email: auth.user.email ?? 'Anda' }];
+          teamMembers = [
+            {
+              id: auth.user.id,
+              email: auth.user.email ?? 'Anda',
+              username: auth.username || (auth.user.email ? auth.user.email.split('@')[0] : 'Anda'),
+            },
+          ];
         }
       }
     } catch {
       if (auth.user) {
-        teamMembers = [{ id: auth.user.id, email: auth.user.email ?? 'Anda' }];
+        teamMembers = [
+          {
+            id: auth.user.id,
+            email: auth.user.email ?? 'Anda',
+            username: auth.username || (auth.user.email ? auth.user.email.split('@')[0] : 'Anda'),
+          },
+        ];
       }
     } finally {
       loadingMembers = false;
     }
   }
 
+  // Filter anggota tim berdasarkan email ATAU username
   const filteredMembers = $derived.by(() => {
-    const q = memberSearch.trim().toLowerCase();
+    const q = memberSearch.trim().toLowerCase().replace(/^@/, '');
     if (!q) return teamMembers;
-    return teamMembers.filter((m) => m.email.toLowerCase().includes(q));
+    return teamMembers.filter((m) => {
+      const email = m.email.toLowerCase();
+      const uname = (m.username || m.email.split('@')[0]).toLowerCase();
+      return email.includes(q) || uname.includes(q);
+    });
   });
 
-  function toggleMember(memberIdOrEmail: string) {
-    if (selectedMembers.includes(memberIdOrEmail)) {
-      selectedMembers = selectedMembers.filter((id) => id !== memberIdOrEmail);
+  // Anggota kustom yang ditambahkan manual via username/email yang tidak cocok dengan ID akun terdaftar
+  const customSelectedMembers = $derived.by(() => {
+    const knownIds = new Set(teamMembers.map((m) => m.id));
+    const knownEmails = new Set(teamMembers.map((m) => m.email.toLowerCase()));
+    const knownUsernames = new Set(teamMembers.map((m) => (m.username || m.email.split('@')[0]).toLowerCase()));
+
+    return selectedMembers.filter((sm) => {
+      const clean = sm.toLowerCase().replace(/^@/, '');
+      return !knownIds.has(sm) && !knownEmails.has(clean) && !knownUsernames.has(clean) && board?.created_by !== sm;
+    });
+  });
+
+  function isMemberSelected(member: TeamMember): boolean {
+    if (board?.created_by === member.id) return true;
+    const uname = (member.username || member.email.split('@')[0]).toLowerCase();
+    const email = member.email.toLowerCase();
+    return selectedMembers.some((sm) => {
+      const clean = sm.toLowerCase().replace(/^@/, '');
+      return sm === member.id || clean === email || clean === uname;
+    });
+  }
+
+  function toggleMember(member: TeamMember) {
+    const uname = (member.username || member.email.split('@')[0]).toLowerCase();
+    const email = member.email.toLowerCase();
+    const isSelected = isMemberSelected(member);
+
+    if (isSelected) {
+      selectedMembers = selectedMembers.filter((sm) => {
+        const clean = sm.toLowerCase().replace(/^@/, '');
+        return sm !== member.id && clean !== email && clean !== uname;
+      });
       const copy = { ...selectedRoles };
-      delete copy[memberIdOrEmail];
+      delete copy[member.id];
+      delete copy[email];
+      delete copy[uname];
+      delete copy[`@${uname}`];
       selectedRoles = copy;
     } else {
-      selectedMembers = [...selectedMembers, memberIdOrEmail];
-      if (!selectedRoles[memberIdOrEmail]) {
-        selectedRoles = { ...selectedRoles, [memberIdOrEmail]: 'user' };
+      selectedMembers = [...selectedMembers, member.id];
+      if (!selectedRoles[member.id]) {
+        selectedRoles = { ...selectedRoles, [member.id]: 'user' };
       }
     }
   }
 
-  function setMemberRole(memberId: string, role: 'admin' | 'user') {
-    selectedRoles = { ...selectedRoles, [memberId]: role };
+  function getMemberRole(member: TeamMember): 'admin' | 'user' {
+    const uname = (member.username || member.email.split('@')[0]).toLowerCase();
+    const email = member.email.toLowerCase();
+    return (
+      selectedRoles[member.id] ||
+      selectedRoles[email] ||
+      selectedRoles[uname] ||
+      selectedRoles[`@${uname}`] ||
+      'user'
+    );
+  }
+
+  function setMemberRole(member: TeamMember, role: 'admin' | 'user') {
+    selectedRoles = { ...selectedRoles, [member.id]: role };
+  }
+
+  function addManualMember() {
+    const input = memberSearch.trim();
+    if (!input) return;
+    const clean = input.toLowerCase();
+    const cleanNoAt = clean.replace(/^@/, '');
+
+    // Cek apakah cocok dengan anggota yang sudah dikenal
+    const match = teamMembers.find(
+      (m) =>
+        m.email.toLowerCase() === clean ||
+        (m.username && m.username.toLowerCase() === cleanNoAt) ||
+        m.email.split('@')[0].toLowerCase() === cleanNoAt
+    );
+
+    const identifierToAdd = match ? match.id : input;
+    if (!selectedMembers.includes(identifierToAdd)) {
+      selectedMembers = [...selectedMembers, identifierToAdd];
+      if (!selectedRoles[identifierToAdd]) {
+        selectedRoles = { ...selectedRoles, [identifierToAdd]: 'user' };
+      }
+      toast.success(`Akses untuk "${input}" berhasil ditambahkan.`);
+    } else {
+      toast.info(`"${input}" sudah ada di daftar akses.`);
+    }
+    memberSearch = '';
+  }
+
+  function removeCustomMember(customItem: string) {
+    selectedMembers = selectedMembers.filter((sm) => sm !== customItem);
+    const copy = { ...selectedRoles };
+    delete copy[customItem];
+    selectedRoles = copy;
+  }
+
+  function setCustomMemberRole(customItem: string, role: 'admin' | 'user') {
+    selectedRoles = { ...selectedRoles, [customItem]: role };
   }
 
   async function handleSave() {
@@ -250,15 +356,32 @@
             </span>
           </div>
 
-          <!-- Input Search Anggota -->
+          <!-- Input Search & Tambah Anggota -->
           <div class="relative mb-2.5">
             <Search class="absolute left-2.5 top-2.5 size-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Cari anggota tim berdasarkan email…"
+              placeholder="Cari atau ketik username / email…"
               bind:value={memberSearch}
-              class="w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none"
+              onkeydown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addManualMember();
+                }
+              }}
+              class="w-full rounded-lg border border-slate-200 bg-white pl-8 pr-18 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none"
             />
+            {#if memberSearch.trim()}
+              <button
+                type="button"
+                onclick={addManualMember}
+                class="absolute right-1 top-1 bottom-1 px-2 text-[10px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition flex items-center gap-1 cursor-pointer"
+                title="Beri akses sesuai username atau email yang diketik"
+              >
+                <UserPlus class="size-3" />
+                Tambah
+              </button>
+            {/if}
           </div>
 
           <!-- List User Checklist -->
@@ -268,14 +391,24 @@
                 <LoaderCircle class="size-4 animate-spin mr-2 text-indigo-600" />
                 Memuat daftar anggota tim…
               </div>
-            {:else if filteredMembers.length === 0}
-              <p class="py-4 text-center text-xs text-slate-400">
-                Tidak ada anggota tim yang cocok dengan "{memberSearch}".
-              </p>
+            {:else if filteredMembers.length === 0 && customSelectedMembers.length === 0}
+              <div class="py-4 text-center text-xs text-slate-400 space-y-1.5">
+                <p>Tidak ada anggota tim yang cocok dengan "{memberSearch}".</p>
+                {#if memberSearch.trim()}
+                  <button
+                    type="button"
+                    onclick={addManualMember}
+                    class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer underline"
+                  >
+                    <UserPlus class="size-3" />
+                    Beri akses ke "{memberSearch.trim()}" sekarang
+                  </button>
+                {/if}
+              </div>
             {:else}
               {#each filteredMembers as member (member.id)}
                 {@const isOwner = board?.created_by === member.id}
-                {@const isSelected = isOwner || selectedMembers.includes(member.id) || selectedMembers.includes(member.email.toLowerCase())}
+                {@const isSelected = isOwner || isMemberSelected(member)}
 
                 <div
                   class="flex items-center justify-between rounded-lg px-2.5 py-1.5 transition {isSelected
@@ -287,10 +420,15 @@
                       type="checkbox"
                       checked={isSelected}
                       disabled={isOwner}
-                      onchange={() => toggleMember(member.id)}
+                      onchange={() => toggleMember(member)}
                       class="size-3.5 text-indigo-600 accent-indigo-600 rounded cursor-pointer disabled:opacity-50"
                     />
-                    <span class="text-xs truncate">{member.email}</span>
+                    <div class="flex flex-col min-w-0">
+                      <span class="text-xs font-semibold text-slate-800 truncate">
+                        @{member.username || member.email.split('@')[0]}
+                      </span>
+                      <span class="text-[11px] text-slate-500 truncate">{member.email}</span>
+                    </div>
                   </label>
 
                   {#if isOwner}
@@ -300,8 +438,8 @@
                   {:else if isSelected}
                     <div class="flex items-center gap-1.5 shrink-0">
                       <select
-                        value={selectedRoles[member.id] || selectedRoles[member.email.toLowerCase()] || 'user'}
-                        onchange={(e) => setMemberRole(member.id, e.currentTarget.value as 'admin' | 'user')}
+                        value={getMemberRole(member)}
+                        onchange={(e) => setMemberRole(member, e.currentTarget.value as 'admin' | 'user')}
                         class="rounded border border-indigo-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-2xs focus:border-indigo-500 focus:outline-none cursor-pointer"
                         title="Peran anggota di papan ini"
                       >
@@ -316,6 +454,44 @@
                   {/if}
                 </div>
               {/each}
+
+              {#if customSelectedMembers.length > 0}
+                <div class="mt-2.5 border-t border-indigo-200/60 pt-2 space-y-1">
+                  <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1">
+                    Akses Khusus (Username / Email Manual)
+                  </div>
+                  {#each customSelectedMembers as customItem (customItem)}
+                    <div
+                      class="flex items-center justify-between rounded-lg bg-indigo-50/90 px-2.5 py-1.5 text-slate-900"
+                    >
+                      <div class="flex items-center gap-2 truncate flex-1 mr-2">
+                        <button
+                          type="button"
+                          onclick={() => removeCustomMember(customItem)}
+                          class="text-slate-400 hover:text-rose-600 transition p-0.5 rounded cursor-pointer"
+                          title="Hapus akses"
+                        >
+                          <X class="size-3.5" />
+                        </button>
+                        <span class="text-xs font-semibold text-slate-800 truncate">
+                          {customItem.startsWith('@') || customItem.includes('@') ? customItem : `@${customItem}`}
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-1.5 shrink-0">
+                        <select
+                          value={selectedRoles[customItem] || 'user'}
+                          onchange={(e) => setCustomMemberRole(customItem, e.currentTarget.value as 'admin' | 'user')}
+                          class="rounded border border-indigo-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-2xs focus:border-indigo-500 focus:outline-none cursor-pointer"
+                          title="Peran anggota di papan ini"
+                        >
+                          <option value="admin">🛡️ Admin</option>
+                          <option value="user">👤 User</option>
+                        </select>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
             {/if}
           </div>
         </div>

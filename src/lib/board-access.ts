@@ -2,6 +2,39 @@ import type { Board, BoardMemberRole, BoardVisibility } from './types';
 import type { User } from '@supabase/supabase-js';
 
 /**
+ * Mengambil seluruh identitas valid pengguna:
+ * 1. user.id (UUID)
+ * 2. user.email (lowercase)
+ * 3. username (bagian sebelum '@' pada email, lowercase & dengan awalan '@')
+ * 4. user_metadata.username (jika ada, lowercase & dengan awalan '@')
+ */
+export function getUserIdentities(user: User | null): string[] {
+  if (!user) return [];
+  const identities: string[] = [user.id];
+
+  if (user.email) {
+    const email = user.email.toLowerCase().trim();
+    identities.push(email);
+    const prefix = email.split('@')[0];
+    if (prefix) {
+      identities.push(prefix);
+      identities.push(`@${prefix}`);
+    }
+  }
+
+  const metaUsername = user.user_metadata?.username;
+  if (typeof metaUsername === 'string' && metaUsername.trim()) {
+    const clean = metaUsername.toLowerCase().trim().replace(/^@/, '');
+    if (clean) {
+      identities.push(clean);
+      identities.push(`@${clean}`);
+    }
+  }
+
+  return Array.from(new Set(identities));
+}
+
+/**
  * Menentukan peran pengguna pada papan tertentu:
  * - 'owner': Pembuat/pemilik papan (created_by)
  * - 'admin': Admin tim atau admin yang ditugaskan khusus di papan
@@ -12,10 +45,15 @@ export function getUserBoardRole(board: Board, user: User | null, isAdmin: boole
   if (board.created_by && board.created_by === user.id) return 'owner';
   if (isAdmin) return 'admin';
 
-  const assigned =
-    board.member_roles?.[user.id] ||
-    (user.email ? board.member_roles?.[user.email.toLowerCase()] : undefined);
-  if (assigned) return assigned;
+  if (!board.member_roles) return 'user';
+
+  const userIdentities = getUserIdentities(user);
+  for (const [key, role] of Object.entries(board.member_roles)) {
+    const cleanKey = key.toLowerCase().trim();
+    if (userIdentities.some((id) => id.toLowerCase().trim() === cleanKey)) {
+      return role;
+    }
+  }
 
   return 'user';
 }
@@ -27,7 +65,8 @@ export function getUserBoardRole(board: Board, user: User | null, isAdmin: boole
  * 2. Pemilik papan (created_by / owner) selalu memiliki akses ke papannya sendiri.
  * 3. Jika visibility 'public' (atau belum diset): seluruh anggota tim yang login boleh melihat.
  * 4. Jika visibility 'private': hanya pemilik dan admin yang boleh melihat.
- * 5. Jika visibility 'members': pemilik, admin, dan anggota yang terdaftar di member_ids yang boleh melihat.
+ * 5. Jika visibility 'members': pemilik, admin, dan anggota yang terdaftar di member_ids
+ *    (berdasarkan ID, email, atau username) yang boleh melihat.
  */
 export function canAccessBoard(board: Board, user: User | null, isAdmin: boolean): boolean {
   if (isAdmin) return true;
@@ -40,9 +79,13 @@ export function canAccessBoard(board: Board, user: User | null, isAdmin: boolean
 
   if (visibility === 'members') {
     const list = board.member_ids || [];
-    const userIdMatch = list.includes(user.id);
-    const userEmailMatch = user.email ? list.includes(user.email.toLowerCase()) : false;
-    return userIdMatch || userEmailMatch;
+    if (list.length === 0) return false;
+
+    const userIdentities = getUserIdentities(user);
+    return list.some((m) => {
+      const cleanMember = m.toLowerCase().trim();
+      return userIdentities.some((id) => id.toLowerCase().trim() === cleanMember);
+    });
   }
 
   return true;

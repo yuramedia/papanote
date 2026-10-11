@@ -12,6 +12,15 @@ class AuthStore {
     return this.user?.email?.toLowerCase() === 'admin@yuramedia.com';
   }
 
+  get username(): string {
+    if (!this.user?.email) return '';
+    const metaUsername = this.user.user_metadata?.username;
+    if (typeof metaUsername === 'string' && metaUsername.trim()) {
+      return metaUsername.trim().replace(/^@/, '');
+    }
+    return this.user.email.split('@')[0];
+  }
+
   get role(): UserRole {
     if (!this.session?.user) return 'user';
     if (this.isOwner) return 'owner';

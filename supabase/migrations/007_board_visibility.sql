@@ -22,20 +22,25 @@ BEGIN
   END IF;
 END $$;
 
--- 3. Fungsi pembantu untuk mengambil daftar email & ID anggota tim
+-- 3. Fungsi pembantu untuk mengambil daftar email, ID, dan username anggota tim
 -- Dapat dipanggil oleh setiap user yang telah login (authenticated)
 -- untuk keperluan memilih rekan tim saat mengatur akses papan.
+DROP FUNCTION IF EXISTS get_team_members();
 CREATE OR REPLACE FUNCTION get_team_members()
 RETURNS TABLE (
   id uuid,
-  email text
+  email text,
+  username text
 )
 LANGUAGE sql
 SECURITY DEFINER
 STABLE
 SET search_path = public, auth
 AS $$
-  SELECT u.id, u.email::text
+  SELECT 
+    u.id, 
+    u.email::text,
+    coalesce(nullif(u.raw_user_meta_data->>'username', ''), split_part(u.email::text, '@', 1))::text as username
   FROM auth.users u
   WHERE auth.uid() IS NOT NULL
   ORDER BY u.email ASC;
@@ -45,7 +50,7 @@ GRANT EXECUTE ON FUNCTION get_team_members() TO authenticated;
 
 -- 4. Perbarui Kebijakan Row Level Security (RLS) pada tabel boards
 -- Hanya board yang berstatus public, atau milik pembuatnya, atau admin,
--- atau user yang terdaftar di member_ids yang boleh dibaca.
+-- atau user yang terdaftar di member_ids (via user ID, email, atau username) yang boleh dibaca.
 DROP POLICY IF EXISTS "boards_select" ON boards;
 CREATE POLICY "boards_select" ON boards
   FOR SELECT TO authenticated
@@ -57,10 +62,15 @@ CREATE POLICY "boards_select" ON boards
       OR is_admin()
       OR auth.uid()::text = ANY(member_ids)
       OR lower(coalesce(auth.jwt()->>'email', '')) = ANY(member_ids)
+      OR split_part(lower(coalesce(auth.jwt()->>'email', '')), '@', 1) = ANY(member_ids)
+      OR concat('@', split_part(lower(coalesce(auth.jwt()->>'email', '')), '@', 1)) = ANY(member_ids)
+      OR lower(coalesce(auth.jwt()->'user_metadata'->>'username', '')) = ANY(member_ids)
+      OR concat('@', lower(coalesce(auth.jwt()->'user_metadata'->>'username', ''))) = ANY(member_ids)
     )
   );
 
 -- Pengguna boleh memperbarui papan miliknya sendiri atau jika merupakan Admin
+-- atau anggota yang terdaftar di member_ids (via ID, email, atau username)
 DROP POLICY IF EXISTS "boards_update" ON boards;
 CREATE POLICY "boards_update" ON boards
   FOR UPDATE TO authenticated
@@ -68,5 +78,10 @@ CREATE POLICY "boards_update" ON boards
     created_by = auth.uid()
     OR is_admin()
     OR auth.uid()::text = ANY(member_ids)
+    OR lower(coalesce(auth.jwt()->>'email', '')) = ANY(member_ids)
+    OR split_part(lower(coalesce(auth.jwt()->>'email', '')), '@', 1) = ANY(member_ids)
+    OR concat('@', split_part(lower(coalesce(auth.jwt()->>'email', '')), '@', 1)) = ANY(member_ids)
+    OR lower(coalesce(auth.jwt()->'user_metadata'->>'username', '')) = ANY(member_ids)
+    OR concat('@', lower(coalesce(auth.jwt()->'user_metadata'->>'username', ''))) = ANY(member_ids)
   )
   WITH CHECK (true);

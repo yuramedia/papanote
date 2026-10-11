@@ -66,9 +66,10 @@
           <!-- Ringkasan Akun -->
           <div class="px-3 py-2 border-b border-slate-100 mb-1">
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Akun Terdaftar</p>
-            <p class="text-xs font-semibold text-slate-800 truncate">{auth.user?.email}</p>
+            <p class="text-xs font-semibold text-slate-800 truncate">@{auth.username}</p>
+            <p class="text-[11px] text-slate-500 truncate">{auth.user?.email}</p>
             <span
-              class="inline-flex items-center gap-1 mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold {auth.role === 'owner'
+              class="inline-flex items-center gap-1 mt-1 rounded px-1.5 py-0.5 text-[10px] font-semibold {auth.role === 'owner'
                 ? 'bg-purple-100 text-purple-700'
                 : auth.role === 'admin'
                   ? 'bg-amber-100 text-amber-700'
@@ -107,8 +108,10 @@
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
 
-    <!-- Email Pengguna -->
-    <span class="hidden text-sm text-white/60 lg:inline truncate max-w-[180px]">{auth.user?.email}</span>
+    <!-- Username / Email Pengguna -->
+    <span class="hidden text-sm text-white/70 lg:inline truncate max-w-[200px]" title={auth.user?.email}>
+      @{auth.username}
+    </span>
 
     <!-- Status Live / Offline (Tepat di sebelah kanan email) -->
     {@render rightStatus?.()}

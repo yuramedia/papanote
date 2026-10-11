@@ -281,7 +281,7 @@
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
                 <tr>
-                  <th class="py-2.5 px-3">Email Pengguna</th>
+                  <th class="py-2.5 px-3">Username & Email</th>
                   <th class="py-2.5 px-3">Role</th>
                   <th class="py-2.5 px-3 hidden sm:table-cell">Terdaftar</th>
                   <th class="py-2.5 px-3 text-right">Aksi</th>
@@ -289,10 +289,14 @@
               </thead>
               <tbody class="divide-y divide-slate-100 text-slate-700">
                 {#each users as u (u.id)}
+                  {@const username = u.email.split('@')[0]}
                   <tr class="hover:bg-slate-50/50 transition-colors">
                     <td class="py-2.5 px-3 font-medium">
-                      <span>{u.email}</span>
-                      <div class="text-[10px] text-slate-400 sm:hidden">
+                      <div class="flex flex-col">
+                        <span class="font-semibold text-slate-900">@{username}</span>
+                        <span class="text-slate-500 text-[11px]">{u.email}</span>
+                      </div>
+                      <div class="text-[10px] text-slate-400 sm:hidden mt-0.5">
                         Masuk: {u.last_sign_in_at ? formatDateTime(u.last_sign_in_at) : 'Belum pernah'}
                       </div>
                     </td>
