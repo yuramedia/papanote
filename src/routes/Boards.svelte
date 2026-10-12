@@ -79,6 +79,7 @@
       position: positionBetween(sorted.at(-1)?.position, null),
       visibility: newVisibility,
       member_ids: newVisibility === 'members' && currentUserId ? [currentUserId] : [],
+      member_roles: {},
       created_by: currentUserId,
       deleted_at: null,
       created_at: now,
@@ -94,6 +95,7 @@
         position: board.position,
         visibility: board.visibility,
         member_ids: board.member_ids,
+        member_roles: board.member_roles,
         created_by: board.created_by,
       });
     if (error) {
