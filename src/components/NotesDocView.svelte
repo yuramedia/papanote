@@ -24,9 +24,11 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import Database from '@lucide/svelte/icons/database';
   import Settings from '@lucide/svelte/icons/settings';
+  import ImageIcon from '@lucide/svelte/icons/image';
   import type { BoardStore } from '../lib/board.svelte';
   import type { Card } from '../lib/types';
   import { renderMarkdown } from '../lib/markdown';
+  import { uploadAttachment, insertImageMarkdown } from '../lib/attachments';
   import { toast } from '../lib/toast.svelte';
 
   let {
@@ -57,6 +59,10 @@
   let activeContent = $state('');
   let editorMode = $state<'preview' | 'edit'>('edit');
   let saveStatus = $state<'saved' | 'saving' | 'idle'>('saved');
+
+  // Lampiran Gambar
+  let isUploadingImage = $state(false);
+  let fileInputEl = $state<HTMLInputElement | null>(null);
 
   // Input buat catatan baru di sidebar
   let creatingInListId = $state<string | null>(null);
@@ -142,6 +148,70 @@
       });
       saveStatus = ok ? 'saved' : 'idle';
     }, 400);
+  }
+
+  async function processImageFile(file: File) {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Berkas harus berupa gambar.');
+      return;
+    }
+    if (!activeCardId) {
+      toast.error('Pilih atau buat catatan terlebih dahulu.');
+      return;
+    }
+    isUploadingImage = true;
+    try {
+      toast.info('Menyiapkan gambar...');
+      const { url, name } = await uploadAttachment(file, `board_${store.board?.id || 'main'}/card_${activeCardId}`);
+      const cursorPos = textareaEl ? textareaEl.selectionStart : undefined;
+      const { newContent, newCursor } = insertImageMarkdown(activeContent, url, name, cursorPos);
+      activeContent = newContent;
+      triggerAutoSave();
+      toast.success('Gambar berhasil disisipkan!');
+
+      if (editorMode === 'edit' && textareaEl) {
+        setTimeout(() => {
+          textareaEl?.focus();
+          textareaEl?.setSelectionRange(newCursor, newCursor);
+        }, 20);
+      }
+    } catch (err) {
+      toast.error(`Gagal menyisipkan gambar: ${(err as Error).message}`);
+    } finally {
+      isUploadingImage = false;
+    }
+  }
+
+  function handleFileInputChange(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const files = input.files;
+    if (!files || files.length === 0) return;
+    processImageFile(files[0]);
+    input.value = '';
+  }
+
+  function handlePaste(e: ClipboardEvent) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          processImageFile(file);
+          break;
+        }
+      }
+    }
+  }
+
+  function handleFileDrop(e: DragEvent) {
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0 && files[0].type.startsWith('image/')) {
+      e.preventDefault();
+      processImageFile(files[0]);
+    }
   }
 
   // Pembuatan Catatan Baru
@@ -565,6 +635,29 @@
 
       <!-- Controls Kanan Header: Mode Toggle & Buka Modal -->
       <div class="flex items-center gap-1.5">
+        <button
+          type="button"
+          onclick={() => fileInputEl?.click()}
+          disabled={isUploadingImage || !activeCardId}
+          class="flex items-center gap-1 rounded-md bg-[#252525] hover:bg-[#303030] px-2 py-1 text-[11px] font-medium text-slate-300 transition cursor-pointer disabled:opacity-40"
+          title="Unggah berkas gambar atau tekan Ctrl + V untuk paste tangkapan layar"
+        >
+          {#if isUploadingImage}
+            <LoaderCircle class="size-3 animate-spin text-indigo-400" />
+            <span class="hidden sm:inline">Mengunggah...</span>
+          {:else}
+            <ImageIcon class="size-3 text-indigo-400" />
+            <span class="hidden sm:inline">Gambar</span>
+          {/if}
+        </button>
+        <input
+          type="file"
+          accept="image/*"
+          bind:this={fileInputEl}
+          onchange={handleFileInputChange}
+          class="hidden"
+        />
+
         <div class="flex items-center rounded-lg bg-[#252525] p-0.5 text-[11px]">
           <button
             type="button"
@@ -604,7 +697,13 @@
     </header>
 
     <!-- Editor Body (Distraction-Free Workspace) -->
-    <div class="relative flex-1 overflow-y-auto p-6 sm:p-12">
+    <div
+      role="region"
+      aria-label="Editor Catatan"
+      class="relative flex-1 overflow-y-auto p-6 sm:p-12"
+      ondragover={(e) => e.preventDefault()}
+      ondrop={handleFileDrop}
+    >
       {#if activeCard}
         <div class="mx-auto max-w-3xl">
           <!-- Judul Catatan Besar (Title) -->
@@ -624,7 +723,8 @@
                 bind:value={activeContent}
                 oninput={handleTextareaInput}
                 onkeydown={handleTextareaKeyDown}
-                placeholder="Mulai menulis catatan… Gunakan # Judul, - [ ] Checklist, atau [[Nama Catatan Lain]] untuk menautkan catatan ala Obsidian."
+                onpaste={handlePaste}
+                placeholder="Mulai menulis catatan… Gunakan # Judul, - [ ] Checklist, atau [[Nama Catatan Lain]] untuk menautkan catatan ala Obsidian. Tekan Ctrl+V untuk tempel gambar."
                 class="w-full min-h-[500px] resize-none bg-transparent font-mono text-[14px] leading-relaxed text-slate-200 placeholder:text-slate-600 border-none outline-none focus:ring-0 selection:bg-indigo-600/40"
               ></textarea>
 

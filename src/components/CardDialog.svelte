@@ -10,6 +10,7 @@
   import Pencil from '@lucide/svelte/icons/pencil';
   import FileText from '@lucide/svelte/icons/file-text';
   import Plus from '@lucide/svelte/icons/plus';
+  import ImageIcon from '@lucide/svelte/icons/image';
   import HistoryPanel from './HistoryPanel.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import BacklinksPanel from './BacklinksPanel.svelte';
@@ -18,6 +19,7 @@
   import type { BoardStore } from '../lib/board.svelte';
   import type { Card } from '../lib/types';
   import { deadlineState, formatDateTime, fromLocalInput, toLocalInput } from '../lib/format';
+  import { extractFirstImage, uploadAttachment, insertImageMarkdown } from '../lib/attachments';
   import { enablePush, pushMessage } from '../lib/push';
   import { toast } from '../lib/toast.svelte';
   import { renderMarkdown } from '../lib/markdown';
@@ -34,6 +36,11 @@
   let confirmOpen = $state(false);
   // Mode tampilan catatan: preview (Obsidian view) vs edit (Markdown raw)
   let mode = $state<'preview' | 'edit'>('preview');
+
+  // Lampiran Gambar & Cover Kartu
+  let isUploadingImage = $state(false);
+  let fileInputEl = $state<HTMLInputElement | null>(null);
+  const coverUrl = $derived(extractFirstImage(content));
 
   // Autocomplete Wikilinks [[
   let textareaEl = $state<HTMLTextAreaElement | null>(null);
@@ -143,6 +150,66 @@
     if (ok) setTimeout(() => saveState === 'saved' && (saveState = 'idle'), 2000);
   }
 
+  async function processImageFile(file: File) {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Berkas harus berupa gambar.');
+      return;
+    }
+    isUploadingImage = true;
+    try {
+      toast.info('Menyiapkan gambar...');
+      const { url, name } = await uploadAttachment(file, `board_${store.board?.id || 'main'}/card_${card.id}`);
+      const cursorPos = textareaEl ? textareaEl.selectionStart : undefined;
+      const { newContent, newCursor } = insertImageMarkdown(content, url, name, cursorPos);
+      content = newContent;
+      await save({ content: newContent });
+      toast.success('Gambar berhasil disisipkan!');
+
+      if (mode === 'edit' && textareaEl) {
+        setTimeout(() => {
+          textareaEl?.focus();
+          textareaEl?.setSelectionRange(newCursor, newCursor);
+        }, 20);
+      }
+    } catch (err) {
+      toast.error(`Gagal menyisipkan gambar: ${(err as Error).message}`);
+    } finally {
+      isUploadingImage = false;
+    }
+  }
+
+  function handleFileInputChange(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const files = input.files;
+    if (!files || files.length === 0) return;
+    processImageFile(files[0]);
+    input.value = '';
+  }
+
+  function handlePaste(e: ClipboardEvent) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          processImageFile(file);
+          break;
+        }
+      }
+    }
+  }
+
+  function handleFileDrop(e: DragEvent) {
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0 && files[0].type.startsWith('image/')) {
+      e.preventDefault();
+      processImageFile(files[0]);
+    }
+  }
+
   // Auto-save saat kursor keluar dari area ketik (on-blur)
   function blurTitle() {
     const v = title.trim();
@@ -236,7 +303,25 @@
     <Dialog.Overlay class="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm" />
     <Dialog.Content
       class="fixed top-1/2 left-1/2 z-40 flex max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+      onpaste={handlePaste}
+      ondragover={(e) => e.preventDefault()}
+      ondrop={handleFileDrop}
     >
+      {#if coverUrl}
+        <div class="relative h-44 sm:h-52 w-full shrink-0 overflow-hidden bg-slate-900 border-b border-slate-100 group">
+          <img
+            src={coverUrl}
+            alt="Cover {title}"
+            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-102"
+          />
+          <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+          <div class="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-lg bg-black/65 px-2.5 py-1 text-xs text-white/90 backdrop-blur-md border border-white/10 shadow-lg">
+            <ImageIcon class="size-3.5 text-indigo-400" />
+            <span>Cover Kartu</span>
+          </div>
+        </div>
+      {/if}
+
       <div class="flex items-start gap-3 border-b border-slate-100 p-5 pb-4">
         <div class="min-w-0 flex-1">
           <Dialog.Title class="sr-only">Detail kartu</Dialog.Title>
@@ -267,21 +352,46 @@
         <div class="min-w-0">
           <div class="mb-2 flex items-center justify-between">
             <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Catatan Markdown</span>
-            <div class="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5 text-xs">
+            <div class="flex items-center gap-2">
               <button
                 type="button"
-                class="flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition {mode === 'preview' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}"
-                onclick={() => (mode = 'preview')}
+                onclick={() => fileInputEl?.click()}
+                disabled={isUploadingImage}
+                class="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+                title="Unggah berkas gambar atau tekan Ctrl + V untuk paste tangkapan layar"
               >
-                <Eye class="size-3.5" /> Preview
+                {#if isUploadingImage}
+                  <LoaderCircle class="size-3.5 animate-spin text-brand-600" />
+                  <span>Mengunggah...</span>
+                {:else}
+                  <ImageIcon class="size-3.5 text-brand-600" />
+                  <span class="hidden sm:inline">Sisipkan Gambar</span>
+                {/if}
               </button>
-              <button
-                type="button"
-                class="flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition {mode === 'edit' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}"
-                onclick={() => (mode = 'edit')}
-              >
-                <Pencil class="size-3.5" /> Edit
-              </button>
+              <input
+                type="file"
+                accept="image/*"
+                bind:this={fileInputEl}
+                onchange={handleFileInputChange}
+                class="hidden"
+              />
+
+              <div class="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5 text-xs">
+                <button
+                  type="button"
+                  class="flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition {mode === 'preview' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}"
+                  onclick={() => (mode = 'preview')}
+                >
+                  <Eye class="size-3.5" /> Preview
+                </button>
+                <button
+                  type="button"
+                  class="flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition {mode === 'edit' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}"
+                  onclick={() => (mode = 'edit')}
+                >
+                  <Pencil class="size-3.5" /> Edit
+                </button>
+              </div>
             </div>
           </div>
 
@@ -386,8 +496,8 @@
               {/if}
 
               <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
-                <span>Tips: Ketik <code>[[</code> untuk saran tautan instan ala Obsidian.</span>
-                <button type="button" class="text-brand-600 font-medium underline" onclick={() => (mode = 'preview')}>
+                <span>Tips: Ketik <code>[[</code> untuk saran tautan, atau tekan <code>Ctrl + V</code> untuk tempel gambar screenshot.</span>
+                <button type="button" class="text-brand-600 font-medium underline cursor-pointer" onclick={() => (mode = 'preview')}>
                   Selesai mengedit &rarr;
                 </button>
               </div>
