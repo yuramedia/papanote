@@ -512,6 +512,7 @@
             <div class="mt-2">
               <HistoryPanel
                 cardId={card.id}
+                currentContent={content}
                 refreshKey={card.updated_at}
                 onrestore={(old) => {
                   content = old;
