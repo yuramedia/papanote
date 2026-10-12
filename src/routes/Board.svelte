@@ -42,6 +42,7 @@
   const store = new BoardStore(boardId);
   let viewMode = $state<'notes' | 'kanban' | 'calendar' | 'graph' | 'canvas'>('kanban');
   let openQuickSwitcher = $state(false);
+  let switcherMode = $state<'search' | 'command'>('search');
   let newList = $state('');
   let exporting = $state(false);
   let listToDelete = $state<List | null>(null);
@@ -65,9 +66,26 @@
   }
 
   function handleGlobalKeyDown(e: KeyboardEvent) {
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'o' || e.key === 'k')) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
       e.preventDefault();
+      switcherMode = 'command';
       openQuickSwitcher = true;
+    } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'o' || e.key.toLowerCase() === 'k')) {
+      e.preventDefault();
+      switcherMode = 'search';
+      openQuickSwitcher = true;
+    }
+  }
+
+  async function handleQuickNewCard() {
+    const targetList = store.sortedLists[0];
+    if (!targetList) {
+      toast.show('Buat list terlebih dahulu sebelum menambah catatan.', 'info');
+      return;
+    }
+    const newCard = await store.addCard(targetList.id, 'Catatan Baru');
+    if (newCard) {
+      openCardById(newCard.id);
     }
   }
 
@@ -173,14 +191,20 @@
       <button
         type="button"
         class="flex w-full max-w-xs md:max-w-sm items-center justify-between rounded-xl bg-white/10 hover:bg-white/15 px-3.5 py-1.5 text-xs text-white/60 hover:text-white border border-white/10 transition-colors cursor-pointer shadow-inner"
-        onclick={() => (openQuickSwitcher = true)}
-        title="Pencarian Cepat Catatan (Ctrl + O / Ctrl + K)"
+        onclick={() => {
+          switcherMode = 'search';
+          openQuickSwitcher = true;
+        }}
+        title="Omnisearch & Command Palette (Ctrl + O / Ctrl + P)"
       >
         <span class="flex items-center gap-2 truncate">
           <Search class="size-3.5 text-indigo-300 shrink-0" />
-          <span class="truncate">Cari catatan...</span>
+          <span class="truncate">Cari catatan atau ketik >...</span>
         </span>
-        <kbd class="font-mono bg-white/15 px-1.5 py-0.5 rounded text-[10px] text-white/80 shrink-0">Ctrl+O</kbd>
+        <div class="flex items-center gap-1 shrink-0">
+          <kbd class="font-mono bg-white/15 px-1.5 py-0.5 rounded text-[10px] text-white/80">Ctrl+O</kbd>
+          <kbd class="font-mono bg-white/15 px-1.5 py-0.5 rounded text-[10px] text-white/80 hidden sm:inline">Ctrl+P</kbd>
+        </div>
       </button>
     {/snippet}
 
@@ -362,7 +386,20 @@
   <CardDialog card={openCard} {store} onclose={closeCard} />
 {/if}
 
-<QuickSwitcherModal bind:open={openQuickSwitcher} {store} onselect={openCardById} />
+<QuickSwitcherModal
+  bind:open={openQuickSwitcher}
+  {store}
+  initialMode={switcherMode}
+  onselect={openCardById}
+  onSwitchView={(v) => (viewMode = v)}
+  onNewCard={handleQuickNewCard}
+  onNewList={() => {
+    const inputEl = document.querySelector('form input[placeholder*="Tambah list"]') as HTMLInputElement | null;
+    inputEl?.focus();
+  }}
+  onExportDocx={exportDocx}
+  onOpenVisibility={() => (visibilityOpen = true)}
+/>
 
 <BoardVisibilityDialog
   bind:open={visibilityOpen}

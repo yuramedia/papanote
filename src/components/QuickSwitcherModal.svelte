@@ -1,75 +1,249 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
   import Search from '@lucide/svelte/icons/search';
+  import Terminal from '@lucide/svelte/icons/terminal';
   import StickyNote from '@lucide/svelte/icons/sticky-note';
-  import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import CornerDownLeft from '@lucide/svelte/icons/corner-down-left';
   import X from '@lucide/svelte/icons/x';
+  import Kanban from '@lucide/svelte/icons/kanban';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import CalendarIcon from '@lucide/svelte/icons/calendar';
+  import Network from '@lucide/svelte/icons/network';
+  import Layers from '@lucide/svelte/icons/layers';
+  import Plus from '@lucide/svelte/icons/plus';
+  import FileDown from '@lucide/svelte/icons/file-down';
+  import Users from '@lucide/svelte/icons/users';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+  import Home from '@lucide/svelte/icons/home';
+  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import { router } from '../lib/router.svelte';
   import type { BoardStore } from '../lib/board.svelte';
-  import type { Card } from '../lib/types';
+  import { searchCards, type SearchCardResult } from '../lib/omnisearch';
+  import { filterCommands, type PaletteCommand } from '../lib/commands';
+  import { getTagColor } from '../lib/tags';
 
   let {
     open = $bindable(false),
     store,
+    initialMode = 'search',
     onselect,
+    onSwitchView,
+    onNewCard,
+    onNewList,
+    onExportDocx,
+    onOpenVisibility,
   }: {
     open?: boolean;
     store: BoardStore;
+    initialMode?: 'search' | 'command';
     onselect: (cardId: string) => void;
+    onSwitchView?: (view: 'kanban' | 'notes' | 'calendar' | 'graph' | 'canvas') => void;
+    onNewCard?: () => void;
+    onNewList?: () => void;
+    onExportDocx?: () => void;
+    onOpenVisibility?: () => void;
   } = $props();
 
   let query = $state('');
   let selectedIndex = $state(0);
   let inputEl = $state<HTMLInputElement | null>(null);
 
-  const activeCards = $derived(store.cards.filter((c) => !c.deleted_at));
+  // Deteksi mode: otomatis berpindah ke command mode jika diawali '>'
+  const isCommandMode = $derived(query.trim().startsWith('>'));
 
-  const filteredCards = $derived.by<Card[]>(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return activeCards.slice(0, 10);
-    return activeCards
-      .filter(
-        (c) =>
-          c.title.toLowerCase().includes(q) ||
-          (c.content && c.content.toLowerCase().includes(q))
-      )
-      .slice(0, 10);
+  // Daftar perintah papan
+  const allCommands = $derived.by<PaletteCommand[]>(() => {
+    const list: PaletteCommand[] = [
+      {
+        id: 'view-notes',
+        title: 'Buka Tampilan Notes (Obsidian View)',
+        description: 'Beralih ke editor dokumen ala Obsidian dengan hierarki folder',
+        category: 'Tampilan',
+        shortcut: 'Notes',
+        keywords: ['notes', 'dokumen', 'obsidian', 'editor', 'tulis'],
+        iconName: 'notes',
+        action: () => {
+          onSwitchView?.('notes');
+        },
+      },
+      {
+        id: 'view-kanban',
+        title: 'Buka Tampilan Kanban Board',
+        description: 'Tampilan kolom dan kartu seret-lepas (drag-and-drop)',
+        category: 'Tampilan',
+        shortcut: 'Kanban',
+        keywords: ['kanban', 'board', 'papan', 'kolom'],
+        iconName: 'kanban',
+        action: () => {
+          onSwitchView?.('kanban');
+        },
+      },
+      {
+        id: 'view-calendar',
+        title: 'Buka Tampilan Kalender & Timeline',
+        description: 'Tampilan agenda bulanan & mingguan berdasarkan tenggat waktu',
+        category: 'Tampilan',
+        shortcut: 'Calendar',
+        keywords: ['kalender', 'calendar', 'timeline', 'jadwal', 'deadline'],
+        iconName: 'calendar',
+        action: () => {
+          onSwitchView?.('calendar');
+        },
+      },
+      {
+        id: 'view-graph',
+        title: 'Buka Tampilan Interactive Graph View',
+        description: 'Graf visualisasi jejaring relasi antar catatan ala Obsidian',
+        category: 'Tampilan',
+        shortcut: 'Graph',
+        keywords: ['graph', 'graf', 'network', 'jaringan', 'relasi', 'node'],
+        iconName: 'graph',
+        action: () => {
+          onSwitchView?.('graph');
+        },
+      },
+      {
+        id: 'view-canvas',
+        title: 'Buka Tampilan Infinite Canvas',
+        description: 'Kanvas tanpa batas untuk papan tulis dan pemetaan ide visual',
+        category: 'Tampilan',
+        shortcut: 'Canvas',
+        keywords: ['canvas', 'kanvas', 'whiteboard', 'mindmap'],
+        iconName: 'canvas',
+        action: () => {
+          onSwitchView?.('canvas');
+        },
+      },
+      {
+        id: 'action-new-card',
+        title: 'Buat Catatan Baru (+ Note)',
+        description: 'Tambahkan catatan baru ke list pertama di papan',
+        category: 'Aksi',
+        shortcut: '+ Note',
+        keywords: ['buat', 'tambah', 'catatan', 'kartu', 'new', 'add'],
+        iconName: 'plus',
+        action: () => {
+          onNewCard?.();
+        },
+      },
+      {
+        id: 'action-new-list',
+        title: 'Buat List Kolom Baru',
+        description: 'Tambahkan kolom list baru ke papan Kanban',
+        category: 'Aksi',
+        shortcut: '+ List',
+        keywords: ['list', 'kolom', 'tambah list', 'buat list'],
+        iconName: 'list-plus',
+        action: () => {
+          onNewList?.();
+        },
+      },
+      {
+        id: 'action-export-docx',
+        title: 'Ekspor Papan ke Dokumen Word (.docx)',
+        description: 'Unduh seluruh catatan papan dalam format berkas Microsoft Word',
+        category: 'Aksi',
+        shortcut: 'Word',
+        keywords: ['ekspor', 'export', 'word', 'docx', 'unduh', 'download'],
+        iconName: 'export',
+        action: () => {
+          onExportDocx?.();
+        },
+      },
+      {
+        id: 'filter-reset',
+        title: 'Reset Semua Filter Tagar',
+        description: `Hapus saringan aktif (${store.activeTags.length} tag terpilih)`,
+        category: 'Filter',
+        keywords: ['reset', 'filter', 'clear', 'tag', 'hapus filter'],
+        iconName: 'filter-x',
+        action: () => {
+          store.clearTags();
+        },
+      },
+      {
+        id: 'board-visibility',
+        title: 'Kelola Visibilitas & Hak Akses Papan',
+        description: 'Atur izin akses papan (Publik, Pribadi, atau Anggota Tertentu)',
+        category: 'Papan',
+        keywords: ['akses', 'visibilitas', 'anggota', 'member', 'izin', 'permission'],
+        iconName: 'users',
+        action: () => {
+          onOpenVisibility?.();
+        },
+      },
+      {
+        id: 'nav-home',
+        title: 'Kembali ke Daftar Papan (Beranda)',
+        description: 'Navigasi kembali ke dashboard utama seluruh papan',
+        category: 'Papan',
+        keywords: ['beranda', 'home', 'kembali', 'daftar papan'],
+        iconName: 'home',
+        action: () => {
+          router.go('/');
+        },
+      },
+    ];
+    return list;
   });
+
+  // Hasil perintah terfilter
+  const filteredCommands = $derived.by<PaletteCommand[]>(() => {
+    if (!isCommandMode) return [];
+    return filterCommands(allCommands, query);
+  });
+
+  // Hasil pencarian kartu terfilter (Omnisearch deep-search)
+  const searchResults = $derived.by<SearchCardResult[]>(() => {
+    if (isCommandMode) return [];
+    return searchCards(store.cards, query, store.lists);
+  });
+
+  // Total item saat ini
+  const totalItems = $derived(isCommandMode ? filteredCommands.length : searchResults.length);
 
   $effect(() => {
     if (open) {
-      query = '';
+      query = initialMode === 'command' ? '> ' : '';
       selectedIndex = 0;
-      setTimeout(() => inputEl?.focus(), 50);
+      setTimeout(() => inputEl?.focus(), 60);
     }
   });
 
   $effect(() => {
-    // Reset selectedIndex saat hasil pencarian berubah
-    if (selectedIndex >= filteredCards.length) {
-      selectedIndex = Math.max(0, filteredCards.length - 1);
+    if (selectedIndex >= totalItems) {
+      selectedIndex = Math.max(0, totalItems - 1);
     }
   });
 
-  function getListTitle(listId: string): string {
-    return store.lists.find((l) => l.id === listId)?.title ?? 'List';
-  }
-
   function handleKeyDown(e: KeyboardEvent) {
-    if (filteredCards.length === 0) return;
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      // Beralih antara mode pencarian dan perintah
+      if (isCommandMode) {
+        query = '';
+      } else {
+        query = '> ';
+      }
+      return;
+    }
+
+    if (totalItems === 0) return;
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      selectedIndex = (selectedIndex + 1) % filteredCards.length;
+      selectedIndex = (selectedIndex + 1) % totalItems;
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      selectedIndex = (selectedIndex - 1 + filteredCards.length) % filteredCards.length;
+      selectedIndex = (selectedIndex - 1 + totalItems) % totalItems;
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      const chosen = filteredCards[selectedIndex];
-      if (chosen) {
-        open = false;
-        onselect(chosen.id);
+      if (isCommandMode) {
+        const cmd = filteredCommands[selectedIndex];
+        if (cmd) executeCommand(cmd);
+      } else {
+        const res = searchResults[selectedIndex];
+        if (res) selectCard(res.card.id);
       }
     }
   }
@@ -78,29 +252,82 @@
     open = false;
     onselect(cardId);
   }
+
+  function executeCommand(cmd: PaletteCommand) {
+    open = false;
+    cmd.action();
+  }
+
+  function switchToMode(mode: 'search' | 'command') {
+    if (mode === 'command') {
+      query = '> ';
+    } else {
+      query = '';
+    }
+    inputEl?.focus();
+  }
 </script>
 
 <Dialog.Root bind:open>
   <Dialog.Portal>
-    <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-in fade-in-0 duration-150" />
+    <Dialog.Overlay class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm animate-in fade-in-0 duration-150" />
     <Dialog.Content
-      class="fixed left-1/2 top-1/4 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-0 rounded-2xl border border-slate-700 bg-slate-900 p-0 text-white shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150"
+      class="fixed left-1/2 top-[15%] z-50 w-full max-w-xl -translate-x-1/2 rounded-2xl border border-slate-700/80 bg-slate-900 p-0 text-white shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150"
     >
+      <!-- Mode Switcher Pills -->
+      <div class="flex items-center justify-between border-b border-white/10 bg-slate-950/70 px-4 py-2 text-xs">
+        <div class="flex items-center gap-1.5">
+          <button
+            type="button"
+            class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition cursor-pointer {!isCommandMode
+              ? 'bg-indigo-600 text-white shadow-xs'
+              : 'text-white/60 hover:text-white'}"
+            onclick={() => switchToMode('search')}
+          >
+            <Search class="size-3.5" />
+            <span>Pencarian Catatan</span>
+            <kbd class="font-mono text-[10px] bg-black/20 px-1 py-0.2 rounded opacity-75">Ctrl+O</kbd>
+          </button>
+          <button
+            type="button"
+            class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition cursor-pointer {isCommandMode
+              ? 'bg-indigo-600 text-white shadow-xs'
+              : 'text-white/60 hover:text-white'}"
+            onclick={() => switchToMode('command')}
+          >
+            <Terminal class="size-3.5" />
+            <span>Command Palette</span>
+            <kbd class="font-mono text-[10px] bg-black/20 px-1 py-0.2 rounded opacity-75">Ctrl+P</kbd>
+          </button>
+        </div>
+        <span class="text-[11px] text-white/40 hidden sm:inline">Tekan <kbd class="font-mono bg-white/10 px-1 rounded">Tab</kbd> untuk ganti</span>
+      </div>
+
+      <!-- Input Bar -->
       <div class="relative flex items-center border-b border-white/10 px-4 py-3.5">
-        <Search class="size-5 text-indigo-400 shrink-0" />
+        {#if isCommandMode}
+          <Terminal class="size-5 text-indigo-400 shrink-0" />
+        {:else}
+          <Search class="size-5 text-indigo-400 shrink-0" />
+        {/if}
+
         <input
           type="text"
           bind:this={inputEl}
           bind:value={query}
           onkeydown={handleKeyDown}
-          placeholder="Cari catatan di papan... (Ketik judul atau isi)"
+          placeholder={isCommandMode
+            ? 'Ketik perintah... (contoh: > kanban, > ekspor, > buat)'
+            : 'Cari catatan... (judul, isi teks markdown, atau #tag)'}
           class="w-full bg-transparent px-3 text-sm text-white placeholder-white/40 focus:outline-none"
         />
+
         {#if query}
           <button
             type="button"
-            onclick={() => (query = '')}
-            class="text-white/40 hover:text-white transition-colors cursor-pointer mr-1"
+            onclick={() => (query = isCommandMode ? '> ' : '')}
+            class="text-white/40 hover:text-white transition-colors cursor-pointer mr-2"
+            title="Bersihkan input"
           >
             <X class="size-4" />
           </button>
@@ -108,44 +335,176 @@
         <span class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50 font-mono">ESC</span>
       </div>
 
-      <div class="max-h-80 overflow-y-auto p-2 space-y-1">
-        {#if filteredCards.length === 0}
-          <div class="py-8 text-center text-xs text-white/40">
-            Tidak ada catatan yang cocok dengan "{query}".
-          </div>
+      <!-- Container Hasil -->
+      <div class="max-h-[22rem] overflow-y-auto p-2 space-y-1 custom-scrollbar">
+        {#if isCommandMode}
+          <!-- DAFTAR PERINTAH (COMMAND PALETTE) -->
+          {#if filteredCommands.length === 0}
+            <div class="py-10 text-center text-xs text-white/40">
+              Tidak ada perintah yang cocok dengan "{query.replace(/^>\s*/, '')}".
+            </div>
+          {:else}
+            {#each filteredCommands as cmd, idx (cmd.id)}
+              {@const isSelected = selectedIndex === idx}
+              <button
+                type="button"
+                onclick={() => executeCommand(cmd)}
+                onmouseenter={() => (selectedIndex = idx)}
+                class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs transition-colors cursor-pointer {isSelected
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-white/80 hover:bg-white/5'}"
+              >
+                <div class="flex items-center gap-3 min-w-0">
+                  <div
+                    class="size-8 rounded-lg flex items-center justify-center shrink-0 {isSelected
+                      ? 'bg-white/20 text-white'
+                      : 'bg-indigo-500/20 text-indigo-300'}"
+                  >
+                    {#if cmd.iconName === 'notes'}
+                      <FileText class="size-4" />
+                    {:else if cmd.iconName === 'kanban'}
+                      <Kanban class="size-4" />
+                    {:else if cmd.iconName === 'calendar'}
+                      <CalendarIcon class="size-4" />
+                    {:else if cmd.iconName === 'graph'}
+                      <Network class="size-4" />
+                    {:else if cmd.iconName === 'canvas'}
+                      <Layers class="size-4" />
+                    {:else if cmd.iconName === 'plus' || cmd.iconName === 'list-plus'}
+                      <Plus class="size-4" />
+                    {:else if cmd.iconName === 'export'}
+                      <FileDown class="size-4" />
+                    {:else if cmd.iconName === 'filter-x'}
+                      <RotateCcw class="size-4" />
+                    {:else if cmd.iconName === 'users'}
+                      <Users class="size-4" />
+                    {:else}
+                      <Home class="size-4" />
+                    {/if}
+                  </div>
+                  <div class="min-w-0">
+                    <p class="font-medium text-sm truncate">{cmd.title}</p>
+                    {#if cmd.description}
+                      <p class="text-[11px] truncate mt-0.5 {isSelected ? 'text-indigo-100' : 'text-slate-400'}">
+                        {cmd.description}
+                      </p>
+                    {/if}
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                  <span
+                    class="rounded px-2 py-0.5 text-[10px] uppercase font-semibold tracking-wider {isSelected
+                      ? 'bg-white/20 text-white'
+                      : 'bg-white/10 text-white/60'}"
+                  >
+                    {cmd.category}
+                  </span>
+                  {#if isSelected}
+                    <CornerDownLeft class="size-3.5 text-white/90" />
+                  {/if}
+                </div>
+              </button>
+            {/each}
+          {/if}
         {:else}
-          {#each filteredCards as card, idx (card.id)}
-            <button
-              type="button"
-              onclick={() => selectCard(card.id)}
-              onmouseenter={() => (selectedIndex = idx)}
-              class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs transition-colors cursor-pointer {selectedIndex === idx
-                ? 'bg-indigo-600 text-white'
-                : 'text-white/80 hover:bg-white/5'}"
-            >
-              <div class="flex items-center gap-2.5 min-w-0">
-                <StickyNote class="size-4 {selectedIndex === idx ? 'text-white' : 'text-indigo-400'} shrink-0" />
-                <span class="font-medium truncate">{card.title}</span>
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                <span class="rounded px-2 py-0.5 text-[10px] {selectedIndex === idx ? 'bg-indigo-700/60 text-white/90' : 'bg-white/10 text-white/60'}">
-                  {getListTitle(card.list_id)}
-                </span>
-                {#if selectedIndex === idx}
-                  <CornerDownLeft class="size-3 text-white/70" />
+          <!-- HASIL PENCARIAN CATATAN (OMNISEARCH) -->
+          {#if searchResults.length === 0}
+            <div class="py-10 text-center text-xs text-white/40">
+              Tidak ada catatan yang cocok dengan "{query}".
+            </div>
+          {:else}
+            {#each searchResults as res, idx (res.card.id)}
+              {@const isSelected = selectedIndex === idx}
+              <button
+                type="button"
+                onclick={() => selectCard(res.card.id)}
+                onmouseenter={() => (selectedIndex = idx)}
+                class="group flex w-full flex-col gap-1.5 rounded-xl px-3 py-2.5 text-left text-xs transition-colors cursor-pointer {isSelected
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-white/80 hover:bg-white/5'}"
+              >
+                <!-- Baris Judul & List -->
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 truncate">
+                    <StickyNote class="size-4 shrink-0 {isSelected ? 'text-white' : 'text-indigo-400'}" />
+                    <span class="font-semibold text-sm truncate">
+                      {#each res.titleSegments as seg}
+                        {#if seg.isMatch}
+                          <mark class="bg-amber-400 text-slate-900 rounded-xs px-0.5 font-bold">{seg.text}</mark>
+                        {:else}
+                          {seg.text}
+                        {/if}
+                      {/each}
+                    </span>
+                  </div>
+
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <span
+                      class="rounded px-2 py-0.5 text-[10px] font-medium {isSelected
+                        ? 'bg-black/20 text-white'
+                        : 'bg-white/10 text-white/70'}"
+                    >
+                      {res.listTitle}
+                    </span>
+                    {#if isSelected}
+                      <CornerDownLeft class="size-3 text-white/80" />
+                    {/if}
+                  </div>
+                </div>
+
+                <!-- Cuplikan Teks yang Cocok (Matching Snippet) -->
+                {#if res.snippetSegments}
+                  <p
+                    class="line-clamp-2 text-xs font-mono break-words {isSelected
+                      ? 'text-indigo-100'
+                      : 'text-slate-400'}"
+                  >
+                    {#each res.snippetSegments as seg}
+                      {#if seg.isMatch}
+                        <mark class="bg-amber-400 text-slate-900 rounded-xs px-0.5 font-bold">{seg.text}</mark>
+                      {:else}
+                        {seg.text}
+                      {/if}
+                    {/each}
+                  </p>
                 {/if}
-              </div>
-            </button>
-          {/each}
+
+                <!-- Tagar & Meta -->
+                {#if res.tags.length > 0}
+                  <div class="flex flex-wrap items-center gap-1 pt-0.5">
+                    {#each res.tags.slice(0, 4) as t (t)}
+                      {@const style = getTagColor(t)}
+                      <span
+                        class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.2 text-[10px] font-medium border {isSelected
+                          ? 'bg-white/20 text-white border-white/30'
+                          : `${style.bg} ${style.text} ${style.border}`}"
+                      >
+                        <span class="opacity-60">#</span>{t}
+                      </span>
+                    {/each}
+                    {#if res.tags.length > 4}
+                      <span class="text-[10px] opacity-75">+{res.tags.length - 4}</span>
+                    {/if}
+                  </div>
+                {/if}
+              </button>
+            {/each}
+          {/if}
         {/if}
       </div>
 
-      <div class="flex items-center justify-between border-t border-white/10 bg-slate-950/60 px-4 py-2 text-[11px] text-white/40">
+      <!-- Footer Modal -->
+      <div class="flex items-center justify-between border-t border-white/10 bg-slate-950/80 px-4 py-2 text-[11px] text-white/40">
         <div class="flex items-center gap-3">
           <span><kbd class="font-mono bg-white/10 px-1 rounded">↑</kbd> <kbd class="font-mono bg-white/10 px-1 rounded">↓</kbd> Navigasi</span>
-          <span><kbd class="font-mono bg-white/10 px-1 rounded">↵</kbd> Buka</span>
+          <span><kbd class="font-mono bg-white/10 px-1 rounded">↵</kbd> {isCommandMode ? 'Jalankan' : 'Buka'}</span>
+          <span><kbd class="font-mono bg-white/10 px-1 rounded">Tab</kbd> Ganti Mode</span>
         </div>
-        <span>Quick Switcher</span>
+        <span class="flex items-center gap-1">
+          <Sparkles class="size-3 text-indigo-400" />
+          <span>Omnisearch &amp; Palette</span>
+        </span>
       </div>
     </Dialog.Content>
   </Dialog.Portal>

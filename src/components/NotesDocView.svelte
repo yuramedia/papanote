@@ -26,6 +26,7 @@
   import Settings from '@lucide/svelte/icons/settings';
   import ImageIcon from '@lucide/svelte/icons/image';
   import Tag from '@lucide/svelte/icons/tag';
+  import Terminal from '@lucide/svelte/icons/terminal';
   import type { BoardStore } from '../lib/board.svelte';
   import type { Card } from '../lib/types';
   import { renderMarkdown } from '../lib/markdown';
@@ -444,6 +445,16 @@
         title="Pencarian Cepat Catatan (Ctrl+O)"
       >
         <Search class="size-4" />
+      </button>
+
+      <!-- Command Palette -->
+      <button
+        type="button"
+        class="rounded p-1.5 transition hover:bg-[#2a2a2a] hover:text-white cursor-pointer"
+        onclick={() => (window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true })))}
+        title="Command Palette (Ctrl+P)"
+      >
+        <Terminal class="size-4 text-indigo-400" />
       </button>
 
       <!-- Switch to Graph View -->
