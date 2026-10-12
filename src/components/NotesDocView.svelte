@@ -10,6 +10,7 @@
   import Network from '@lucide/svelte/icons/network';
   import Layers from '@lucide/svelte/icons/layers';
   import Kanban from '@lucide/svelte/icons/kanban';
+  import CalendarIcon from '@lucide/svelte/icons/calendar';
   import Eye from '@lucide/svelte/icons/eye';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Plus from '@lucide/svelte/icons/plus';
@@ -35,7 +36,7 @@
   }: {
     store: BoardStore;
     onopen: (id: string) => void;
-    onSwitchView: (view: 'kanban' | 'graph' | 'canvas' | 'notes') => void;
+    onSwitchView: (view: 'kanban' | 'graph' | 'canvas' | 'notes' | 'calendar') => void;
   } = $props();
 
   // Sidebar collapse toggle
@@ -358,6 +359,16 @@
         title="Tampilan Kanban Papan"
       >
         <Kanban class="size-4" />
+      </button>
+
+      <!-- Switch to Calendar View -->
+      <button
+        type="button"
+        class="rounded p-1.5 transition hover:bg-[#2a2a2a] hover:text-white cursor-pointer"
+        onclick={() => onSwitchView('calendar')}
+        title="Tampilan Kalender & Timeline"
+      >
+        <CalendarIcon class="size-4" />
       </button>
     </div>
 

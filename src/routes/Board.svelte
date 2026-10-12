@@ -7,6 +7,7 @@
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import Kanban from '@lucide/svelte/icons/kanban';
+  import CalendarIcon from '@lucide/svelte/icons/calendar';
   import Network from '@lucide/svelte/icons/network';
   import Layers from '@lucide/svelte/icons/layers';
   import FileText from '@lucide/svelte/icons/file-text';
@@ -20,6 +21,7 @@
   import ConfirmDialog from '../components/ConfirmDialog.svelte';
   import GraphView from '../components/GraphView.svelte';
   import CanvasView from '../components/CanvasView.svelte';
+  import CalendarView from '../components/CalendarView.svelte';
   import NotesDocView from '../components/NotesDocView.svelte';
   import BoardVisibilityDialog from '../components/BoardVisibilityDialog.svelte';
   import QuickSwitcherModal from '../components/QuickSwitcherModal.svelte';
@@ -35,7 +37,7 @@
 
   // svelte-ignore state_referenced_locally — komponen di-key per boardId di App.svelte
   const store = new BoardStore(boardId);
-  let viewMode = $state<'notes' | 'kanban' | 'graph' | 'canvas'>('kanban');
+  let viewMode = $state<'notes' | 'kanban' | 'calendar' | 'graph' | 'canvas'>('kanban');
   let openQuickSwitcher = $state(false);
   let newList = $state('');
   let exporting = $state(false);
@@ -127,6 +129,17 @@
         >
           <Kanban class="size-3.5" />
           <span class="hidden sm:inline">Kanban</span>
+        </button>
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'calendar'
+            ? 'bg-indigo-600 text-white shadow-sm'
+            : 'text-white/70 hover:text-white'}"
+          onclick={() => (viewMode = 'calendar')}
+          title="Tampilan Kalender & Timeline"
+        >
+          <CalendarIcon class="size-3.5" />
+          <span class="hidden sm:inline">Calendar</span>
         </button>
         <button
           type="button"
@@ -285,6 +298,10 @@
   {:else if viewMode === 'notes'}
     <div class="flex flex-1 overflow-hidden">
       <NotesDocView {store} onopen={openCardById} onSwitchView={(v) => (viewMode = v)} />
+    </div>
+  {:else if viewMode === 'calendar'}
+    <div class="flex flex-1 overflow-hidden">
+      <CalendarView {store} onopen={openCardById} />
     </div>
   {:else if viewMode === 'graph'}
     <div class="flex flex-1 overflow-hidden">
