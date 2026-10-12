@@ -11,6 +11,7 @@
   import Layers from '@lucide/svelte/icons/layers';
   import Kanban from '@lucide/svelte/icons/kanban';
   import CalendarIcon from '@lucide/svelte/icons/calendar';
+  import Table2 from '@lucide/svelte/icons/table-2';
   import Eye from '@lucide/svelte/icons/eye';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Plus from '@lucide/svelte/icons/plus';
@@ -41,7 +42,7 @@
   }: {
     store: BoardStore;
     onopen: (id: string) => void;
-    onSwitchView: (view: 'kanban' | 'graph' | 'canvas' | 'notes' | 'calendar') => void;
+    onSwitchView: (view: 'kanban' | 'graph' | 'canvas' | 'notes' | 'calendar' | 'table') => void;
   } = $props();
 
   // Sidebar collapse toggle
@@ -495,6 +496,16 @@
         title="Tampilan Kalender & Timeline"
       >
         <CalendarIcon class="size-4" />
+      </button>
+
+      <!-- Switch to Table View -->
+      <button
+        type="button"
+        class="rounded p-1.5 transition hover:bg-[#2a2a2a] hover:text-white cursor-pointer"
+        onclick={() => onSwitchView('table')}
+        title="Tampilan Database Tabel ala Notion"
+      >
+        <Table2 class="size-4" />
       </button>
     </div>
 

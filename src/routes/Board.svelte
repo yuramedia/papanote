@@ -11,6 +11,7 @@
   import Network from '@lucide/svelte/icons/network';
   import Layers from '@lucide/svelte/icons/layers';
   import FileText from '@lucide/svelte/icons/file-text';
+  import Table2 from '@lucide/svelte/icons/table-2';
   import Globe from '@lucide/svelte/icons/globe';
   import Lock from '@lucide/svelte/icons/lock';
   import Users from '@lucide/svelte/icons/users';
@@ -25,6 +26,7 @@
   import CanvasView from '../components/CanvasView.svelte';
   import CalendarView from '../components/CalendarView.svelte';
   import NotesDocView from '../components/NotesDocView.svelte';
+  import TableView from '../components/TableView.svelte';
   import BoardVisibilityDialog from '../components/BoardVisibilityDialog.svelte';
   import QuickSwitcherModal from '../components/QuickSwitcherModal.svelte';
   import { BoardStore } from '../lib/board.svelte';
@@ -40,7 +42,7 @@
 
   // svelte-ignore state_referenced_locally — komponen di-key per boardId di App.svelte
   const store = new BoardStore(boardId);
-  let viewMode = $state<'notes' | 'kanban' | 'calendar' | 'graph' | 'canvas'>('kanban');
+  let viewMode = $state<'notes' | 'kanban' | 'calendar' | 'graph' | 'canvas' | 'table'>('kanban');
   let openQuickSwitcher = $state(false);
   let switcherMode = $state<'search' | 'command'>('search');
   let newList = $state('');
@@ -183,6 +185,17 @@
         >
           <Layers class="size-3.5" />
           <span class="hidden sm:inline">Canvas</span>
+        </button>
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'table'
+            ? 'bg-indigo-600 text-white shadow-sm'
+            : 'text-white/70 hover:text-white'}"
+          onclick={() => (viewMode = 'table')}
+          title="Tampilan Database Tabel ala Notion"
+        >
+          <Table2 class="size-3.5" />
+          <span class="hidden sm:inline">Table</span>
         </button>
       </div>
     {/snippet}
@@ -373,6 +386,10 @@
     {:else if viewMode === 'graph'}
       <div class="flex flex-1 overflow-hidden">
         <GraphView {store} onopen={openCardById} />
+      </div>
+    {:else if viewMode === 'table'}
+      <div class="flex flex-1 overflow-hidden">
+        <TableView {store} onopen={openCardById} />
       </div>
     {:else}
       <div class="flex flex-1 overflow-hidden">

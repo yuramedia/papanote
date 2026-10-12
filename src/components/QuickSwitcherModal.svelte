@@ -16,6 +16,7 @@
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import Home from '@lucide/svelte/icons/home';
   import Sparkles from '@lucide/svelte/icons/sparkles';
+  import Table2 from '@lucide/svelte/icons/table-2';
   import { router } from '../lib/router.svelte';
   import type { BoardStore } from '../lib/board.svelte';
   import { searchCards, type SearchCardResult } from '../lib/omnisearch';
@@ -37,7 +38,7 @@
     store: BoardStore;
     initialMode?: 'search' | 'command';
     onselect: (cardId: string) => void;
-    onSwitchView?: (view: 'kanban' | 'notes' | 'calendar' | 'graph' | 'canvas') => void;
+    onSwitchView?: (view: 'kanban' | 'notes' | 'calendar' | 'graph' | 'canvas' | 'table') => void;
     onNewCard?: () => void;
     onNewList?: () => void;
     onExportDocx?: () => void;
@@ -112,6 +113,18 @@
         iconName: 'canvas',
         action: () => {
           onSwitchView?.('canvas');
+        },
+      },
+      {
+        id: 'view-table',
+        title: 'Buka Tampilan Database Tabel (Notion Grid View)',
+        description: 'Tampilan tabel database terstruktur dengan filter list, tagar, dan sorting',
+        category: 'Tampilan',
+        shortcut: 'Table',
+        keywords: ['table', 'tabel', 'grid', 'database', 'notion', 'airtable', 'baris', 'kolom'],
+        iconName: 'table',
+        action: () => {
+          onSwitchView?.('table');
         },
       },
       {
@@ -370,6 +383,8 @@
                       <Network class="size-4" />
                     {:else if cmd.iconName === 'canvas'}
                       <Layers class="size-4" />
+                    {:else if cmd.iconName === 'table'}
+                      <Table2 class="size-4" />
                     {:else if cmd.iconName === 'plus' || cmd.iconName === 'list-plus'}
                       <Plus class="size-4" />
                     {:else if cmd.iconName === 'export'}
