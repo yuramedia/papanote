@@ -5,6 +5,10 @@
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import Maximize from '@lucide/svelte/icons/maximize';
   import Network from '@lucide/svelte/icons/network';
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+  import Search from '@lucide/svelte/icons/search';
+  import X from '@lucide/svelte/icons/x';
+  import Sparkles from '@lucide/svelte/icons/sparkles';
   import type { BoardStore } from '../lib/board.svelte';
   import type { Card } from '../lib/types';
 
@@ -50,6 +54,41 @@
   let mouseStartY = 0;
   let hasMoved = false;
 
+  // Kontrol Panel Pengaturan ala Obsidian
+  let showSettings = $state(false);
+  let searchQuery = $state('');
+  let showOrphans = $state(true);
+  let showArrows = $state(true);
+  let showParticles = $state(true);
+  let repelForce = $state(1800);
+  let linkDistance = $state(120);
+  let nodeScale = $state(1.0);
+  let linkThickness = $state(1.2);
+  let selectedLists = $state<string[]>([]);
+  let particleProgress = 0;
+
+  function toggleListFilter(listId: string) {
+    if (selectedLists.includes(listId)) {
+      selectedLists = selectedLists.filter((id) => id !== listId);
+    } else {
+      selectedLists = [...selectedLists, listId];
+    }
+    buildGraph();
+  }
+
+  function resetPhysics() {
+    repelForce = 1800;
+    linkDistance = 120;
+    nodeScale = 1.0;
+    linkThickness = 1.2;
+    showArrows = true;
+    showParticles = true;
+    showOrphans = true;
+    searchQuery = '';
+    selectedLists = [];
+    buildGraph();
+  }
+
   // Palet warna untuk list
   const LIST_COLORS = [
     '#6366f1', // Indigo
@@ -70,7 +109,11 @@
 
   // Bangun struktur nodes & edges dari store.cards
   function buildGraph() {
-    const activeCards = store.cards.filter((c) => !c.deleted_at);
+    let activeCards = store.cards.filter((c) => !c.deleted_at);
+    if (selectedLists.length > 0) {
+      activeCards = activeCards.filter((c) => selectedLists.includes(c.list_id));
+    }
+
     const cardMap = new Map<string, Card>();
     activeCards.forEach((c) => {
       cardMap.set(c.id, c);
@@ -102,6 +145,13 @@
       }
     });
 
+    // Saring catatan yatim jika opsi showOrphans = false
+    const visibleCards = showOrphans
+      ? activeCards
+      : activeCards.filter((c) => (connectionCounts.get(c.id) || 0) > 0);
+
+    const visibleIdSet = new Set(visibleCards.map((c) => c.id));
+
     // Pertahankan posisi node yang sudah ada jika memungkinkan
     const existingNodeMap = new Map(nodes.map((n) => [n.id, n]));
     const width = canvasContainer ? canvasContainer.clientWidth : 800;
@@ -109,10 +159,11 @@
     const centerX = width / 2;
     const centerY = height / 2;
 
-    const newNodes: NodeItem[] = activeCards.map((card, i) => {
+    const newNodes: NodeItem[] = visibleCards.map((card, i) => {
       const existing = existingNodeMap.get(card.id);
       const connections = connectionCounts.get(card.id) || 0;
-      const radius = Math.min(28, Math.max(14, 14 + connections * 3.5));
+      const baseRadius = Math.min(28, Math.max(14, 14 + connections * 3.5));
+      const radius = Math.max(8, baseRadius * nodeScale);
       const list = store.lists.find((l) => l.id === card.list_id);
 
       if (existing) {
@@ -127,7 +178,7 @@
       }
 
       // Distribusi lingkaran awal
-      const angle = (i / Math.max(1, activeCards.length)) * Math.PI * 2;
+      const angle = (i / Math.max(1, visibleCards.length)) * Math.PI * 2;
       const dist = 100 + Math.random() * 180;
       return {
         id: card.id,
@@ -144,7 +195,7 @@
     });
 
     nodes = newNodes;
-    edges = newEdges;
+    edges = newEdges.filter((e) => visibleIdSet.has(e.source) && visibleIdSet.has(e.target));
   }
 
   // Simulasi gaya fisika (Force-directed graph layout)
@@ -156,6 +207,11 @@
 
     const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
+    // Alirkan partikel animasi
+    if (showParticles) {
+      particleProgress = (particleProgress + 0.007) % 1;
+    }
+
     // 1. Gaya tolak-menolak antar semua node (Coulomb Repulsion)
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
@@ -166,8 +222,8 @@
         const distSq = dx * dx + dy * dy || 1;
         const dist = Math.sqrt(distSq);
 
-        if (dist < 400) {
-          const force = 1800 / distSq;
+        if (dist < 450) {
+          const force = repelForce / distSq;
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
 
@@ -192,8 +248,7 @@
       const dx = target.x - source.x;
       const dy = target.y - source.y;
       const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      const desiredDist = 120;
-      const force = (dist - desiredDist) * 0.035;
+      const force = (dist - linkDistance) * 0.035;
       const fx = (dx / dist) * force;
       const fy = (dy / dist) * force;
 
@@ -261,6 +316,8 @@
 
     const nodeMap = new Map(nodes.map((n) => [n.id, n]));
     const hoveredId = hoveredNode?.id;
+    const q = searchQuery.trim().toLowerCase();
+    const isSearchActive = q.length > 0;
 
     // 1. Gambar Edges / Garis Penghubung
     for (const edge of edges) {
@@ -269,7 +326,8 @@
       if (!source || !target) continue;
 
       const isConnectedToHover = hoveredId && (edge.source === hoveredId || edge.target === hoveredId);
-      const isDimmed = hoveredId && !isConnectedToHover;
+      const isSearchHit = isSearchActive && (source.title.toLowerCase().includes(q) || target.title.toLowerCase().includes(q));
+      const isDimmed = (hoveredId && !isConnectedToHover) || (isSearchActive && !isSearchHit);
 
       ctx.beginPath();
       ctx.moveTo(source.x, source.y);
@@ -277,21 +335,75 @@
 
       if (isConnectedToHover) {
         ctx.strokeStyle = '#818cf8'; // indigo-400 terang
-        ctx.lineWidth = 2.5 / zoom;
+        ctx.lineWidth = Math.max(1, (linkThickness * 2) / zoom);
         ctx.shadowColor = '#6366f1';
         ctx.shadowBlur = 8;
+      } else if (isSearchHit) {
+        ctx.strokeStyle = '#38bdf8'; // sky-400 terang
+        ctx.lineWidth = Math.max(1, (linkThickness * 1.5) / zoom);
+        ctx.shadowColor = '#0284c7';
+        ctx.shadowBlur = 6;
       } else if (isDimmed) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-        ctx.lineWidth = 1 / zoom;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.lineWidth = Math.max(0.4, 0.8 / zoom);
         ctx.shadowBlur = 0;
       } else {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.lineWidth = 1.2 / zoom;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+        ctx.lineWidth = Math.max(0.6, linkThickness / zoom);
         ctx.shadowBlur = 0;
       }
 
       ctx.stroke();
       ctx.shadowBlur = 0; // reset
+
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      const dist = Math.hypot(dx, dy) || 1;
+
+      // Panah penunjuk arah (Arrowheads)
+      if (showArrows && dist > target.radius + 12) {
+        const arrowLen = Math.max(6, 7 * linkThickness);
+        const arrowAngle = Math.PI / 7;
+        const targetEdgeX = target.x - (dx / dist) * (target.radius + 3);
+        const targetEdgeY = target.y - (dy / dist) * (target.radius + 3);
+        const angle = Math.atan2(dy, dx);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(targetEdgeX, targetEdgeY);
+        ctx.lineTo(
+          targetEdgeX - arrowLen * Math.cos(angle - arrowAngle),
+          targetEdgeY - arrowLen * Math.sin(angle - arrowAngle)
+        );
+        ctx.lineTo(
+          targetEdgeX - arrowLen * Math.cos(angle + arrowAngle),
+          targetEdgeY - arrowLen * Math.sin(angle + arrowAngle)
+        );
+        ctx.closePath();
+        ctx.fillStyle = isConnectedToHover
+          ? '#a5b4fc'
+          : isSearchHit
+            ? '#38bdf8'
+            : isDimmed
+              ? 'rgba(255, 255, 255, 0.05)'
+              : 'rgba(255, 255, 255, 0.45)';
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Animasi aliran partikel bercahaya (Particle Flow)
+      if (showParticles && !isDimmed && dist > 20) {
+        const px = source.x + dx * particleProgress;
+        const py = source.y + dy * particleProgress;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(px, py, Math.max(1.5, 2 * linkThickness) / zoom, 0, Math.PI * 2);
+        ctx.fillStyle = isConnectedToHover ? '#c7d2fe' : isSearchHit ? '#7dd3fc' : '#818cf8';
+        ctx.shadowColor = isConnectedToHover ? '#818cf8' : '#38bdf8';
+        ctx.shadowBlur = 8;
+        ctx.fill();
+        ctx.restore();
+      }
     }
 
     // 2. Gambar Nodes (Lingkaran)
@@ -300,7 +412,8 @@
       const isConnected = hoveredId && edges.some(
         (e) => (e.source === hoveredId && e.target === node.id) || (e.target === hoveredId && e.source === node.id)
       );
-      const isDimmed = hoveredId && !isHovered && !isConnected;
+      const isMatch = isSearchActive && node.title.toLowerCase().includes(q);
+      const isDimmed = (hoveredId && !isHovered && !isConnected) || (isSearchActive && !isMatch && !isHovered && !isConnected);
 
       ctx.save();
       ctx.beginPath();
@@ -308,18 +421,26 @@
 
       if (isHovered) {
         ctx.shadowColor = node.color;
-        ctx.shadowBlur = 16;
+        ctx.shadowBlur = 18;
         ctx.fillStyle = node.color;
         ctx.fill();
         ctx.lineWidth = 3 / zoom;
         ctx.strokeStyle = '#ffffff';
         ctx.stroke();
+      } else if (isMatch) {
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = node.color;
+        ctx.fill();
+        ctx.lineWidth = 2.5 / zoom;
+        ctx.strokeStyle = '#38bdf8';
+        ctx.stroke();
       } else if (isDimmed) {
         ctx.fillStyle = node.color;
-        ctx.globalAlpha = 0.25;
+        ctx.globalAlpha = 0.2;
         ctx.fill();
         ctx.lineWidth = 1 / zoom;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
         ctx.stroke();
       } else {
         ctx.shadowColor = node.color;
@@ -333,28 +454,28 @@
       ctx.restore();
 
       // 3. Label Judul Kartu
-      const showLabel = zoom > 0.45 || isHovered || isConnected;
+      const showLabel = zoom > 0.45 || isHovered || isConnected || isMatch;
       if (showLabel) {
         ctx.save();
-        ctx.font = `${isHovered ? '600' : '500'} ${Math.max(10, 12 / Math.min(1, zoom))}px Inter, system-ui, sans-serif`;
+        ctx.font = `${isHovered || isMatch ? '600' : '500'} ${Math.max(10, 12 / Math.min(1, zoom))}px Inter, system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
 
         const labelY = node.y + node.radius + 6;
         const text = node.title.length > 24 ? node.title.slice(0, 22) + '…' : node.title;
 
-        // Background pill untuk label saat di-hover
-        if (isHovered) {
+        // Background pill untuk label saat di-hover atau search match
+        if (isHovered || isMatch) {
           const metrics = ctx.measureText(text);
           const padding = 6;
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+          ctx.fillStyle = isMatch && !isHovered ? 'rgba(8, 47, 73, 0.9)' : 'rgba(15, 23, 42, 0.9)';
           ctx.fillRect(
             node.x - metrics.width / 2 - padding,
             labelY - 2,
             metrics.width + padding * 2,
             18
           );
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.strokeStyle = isMatch ? 'rgba(56, 189, 248, 0.5)' : 'rgba(255, 255, 255, 0.2)';
           ctx.lineWidth = 1;
           ctx.strokeRect(
             node.x - metrics.width / 2 - padding,
@@ -364,7 +485,13 @@
           );
         }
 
-        ctx.fillStyle = isDimmed ? 'rgba(255, 255, 255, 0.3)' : isHovered ? '#ffffff' : 'rgba(255, 255, 255, 0.85)';
+        ctx.fillStyle = isDimmed
+          ? 'rgba(255, 255, 255, 0.25)'
+          : isHovered
+            ? '#ffffff'
+            : isMatch
+              ? '#7dd3fc'
+              : 'rgba(255, 255, 255, 0.85)';
         ctx.fillText(text, node.x, labelY);
         ctx.restore();
       }
@@ -528,11 +655,14 @@
     window.removeEventListener('resize', handleResize);
   });
 
-  // Re-build graph jika cards / lists di store berubah
+  // Re-build graph jika cards / lists di store berubah atau filter berubah
   $effect(() => {
     // pantau dependensi reaktif
     const _c = store.cards.length;
     const _l = store.lists.length;
+    const _orphans = showOrphans;
+    const _scale = nodeScale;
+    const _lists = selectedLists.join(',');
     buildGraph();
   });
 </script>
@@ -549,6 +679,216 @@
     onwheel={handleWheel}
     class="block h-full w-full"
   ></canvas>
+
+  <!-- Tombol Toggle Panel Pengaturan Sudut Kiri Atas -->
+  <div class="absolute left-4 top-4 z-20 flex items-center gap-2">
+    <button
+      type="button"
+      onclick={() => (showSettings = !showSettings)}
+      class="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-900/85 px-3 py-2 text-xs font-medium text-white/90 backdrop-blur-md shadow-xl hover:bg-white/10 hover:text-white transition-all cursor-pointer {showSettings ? 'border-indigo-500/50 bg-indigo-950/80 text-indigo-200' : ''}"
+      title="Buka Pengaturan Graf"
+    >
+      <SlidersHorizontal class="size-4 text-indigo-400" />
+      <span>Pengaturan Graf</span>
+      {#if searchQuery || !showOrphans || selectedLists.length > 0}
+        <span class="size-2 rounded-full bg-indigo-400 animate-pulse"></span>
+      {/if}
+    </button>
+  </div>
+
+  <!-- Panel Pengaturan ala Obsidian -->
+  {#if showSettings}
+    <div
+      class="absolute left-4 top-16 z-30 w-80 max-h-[calc(100%-80px)] overflow-y-auto rounded-2xl border border-white/15 bg-slate-950/95 p-4 text-white shadow-2xl backdrop-blur-xl space-y-4"
+    >
+      <!-- Header Panel -->
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <div class="flex items-center gap-2 font-semibold text-sm text-indigo-300">
+          <Network class="size-4" />
+          <span>Pengaturan Graf</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button
+            type="button"
+            onclick={resetPhysics}
+            class="rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+            title="Reset Pengaturan ke Default"
+          >
+            <RotateCcw class="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onclick={() => (showSettings = false)}
+            class="rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+            title="Tutup Panel"
+          >
+            <X class="size-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <!-- 1. Pencarian Node -->
+      <div class="space-y-1.5">
+        <label for="graph-search" class="text-[11px] font-semibold text-white/70 uppercase tracking-wider block">
+          Cari Catatan
+        </label>
+        <div class="relative">
+          <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-white/40" />
+          <input
+            id="graph-search"
+            type="text"
+            bind:value={searchQuery}
+            placeholder="Ketik judul catatan..."
+            class="w-full rounded-lg border border-white/10 bg-white/5 py-1.5 pl-8 pr-7 text-xs text-white placeholder-white/40 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+          {#if searchQuery}
+            <button
+              type="button"
+              onclick={() => (searchQuery = '')}
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white cursor-pointer"
+            >
+              <X class="size-3" />
+            </button>
+          {/if}
+        </div>
+      </div>
+
+      <!-- 2. Filter & Tampilan -->
+      <div class="space-y-2.5 border-t border-white/10 pt-3">
+        <span class="text-[11px] font-semibold text-white/70 uppercase tracking-wider block">
+          Filter & Tampilan
+        </span>
+        <label class="flex items-center justify-between text-xs text-white/80 cursor-pointer select-none">
+          <span>Tampilkan Catatan Yatim</span>
+          <input
+            type="checkbox"
+            bind:checked={showOrphans}
+            class="size-4 rounded border-white/20 bg-white/5 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-500"
+          />
+        </label>
+        <label class="flex items-center justify-between text-xs text-white/80 cursor-pointer select-none">
+          <span>Panah Arah Tautan</span>
+          <input
+            type="checkbox"
+            bind:checked={showArrows}
+            class="size-4 rounded border-white/20 bg-white/5 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-500"
+          />
+        </label>
+        <label class="flex items-center justify-between text-xs text-white/80 cursor-pointer select-none">
+          <span class="flex items-center gap-1.5">
+            <Sparkles class="size-3.5 text-indigo-400" />
+            <span>Aliran Partikel Bercahaya</span>
+          </span>
+          <input
+            type="checkbox"
+            bind:checked={showParticles}
+            class="size-4 rounded border-white/20 bg-white/5 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-500"
+          />
+        </label>
+      </div>
+
+      <!-- 3. Filter Berdasarkan List/Kolom -->
+      {#if store.lists.length > 0}
+        <div class="space-y-2 border-t border-white/10 pt-3">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-semibold text-white/70 uppercase tracking-wider">
+              Filter Kolom ({selectedLists.length === 0 ? 'Semua' : selectedLists.length})
+            </span>
+            {#if selectedLists.length > 0}
+              <button
+                type="button"
+                onclick={() => (selectedLists = [])}
+                class="text-[10px] text-indigo-400 hover:underline cursor-pointer"
+              >
+                Reset
+              </button>
+            {/if}
+          </div>
+          <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+            {#each store.lists as list}
+              {@const isSelected = selectedLists.includes(list.id)}
+              <button
+                type="button"
+                onclick={() => toggleListFilter(list.id)}
+                class="flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] transition cursor-pointer {isSelected
+                  ? 'border-indigo-400 bg-indigo-950/80 text-white shadow-xs'
+                  : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}"
+              >
+                <span class="size-2 rounded-full" style="background-color: {getListColor(list.id)}"></span>
+                <span class="truncate max-w-[100px]">{list.title}</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
+      <!-- 4. Kontrol Simulasi Fisika -->
+      <div class="space-y-3 border-t border-white/10 pt-3 text-xs">
+        <span class="text-[11px] font-semibold text-white/70 uppercase tracking-wider block">
+          Simulasi Fisika
+        </span>
+        <div class="space-y-1">
+          <div class="flex justify-between text-white/70 text-[11px]">
+            <span>Gaya Tolak (Repulsi)</span>
+            <span class="font-mono text-indigo-300">{repelForce}</span>
+          </div>
+          <input
+            type="range"
+            min="600"
+            max="4000"
+            step="100"
+            bind:value={repelForce}
+            class="w-full accent-indigo-500 cursor-pointer h-1.5 bg-white/10 rounded-lg"
+          />
+        </div>
+
+        <div class="space-y-1">
+          <div class="flex justify-between text-white/70 text-[11px]">
+            <span>Jarak Tautan (Pegas)</span>
+            <span class="font-mono text-indigo-300">{linkDistance}px</span>
+          </div>
+          <input
+            type="range"
+            min="50"
+            max="260"
+            step="10"
+            bind:value={linkDistance}
+            class="w-full accent-indigo-500 cursor-pointer h-1.5 bg-white/10 rounded-lg"
+          />
+        </div>
+
+        <div class="space-y-1">
+          <div class="flex justify-between text-white/70 text-[11px]">
+            <span>Ukuran Node</span>
+            <span class="font-mono text-indigo-300">{nodeScale.toFixed(1)}x</span>
+          </div>
+          <input
+            type="range"
+            min="0.6"
+            max="2.0"
+            step="0.1"
+            bind:value={nodeScale}
+            class="w-full accent-indigo-500 cursor-pointer h-1.5 bg-white/10 rounded-lg"
+          />
+        </div>
+
+        <div class="space-y-1">
+          <div class="flex justify-between text-white/70 text-[11px]">
+            <span>Ketebalan Garis</span>
+            <span class="font-mono text-indigo-300">{linkThickness.toFixed(1)}px</span>
+          </div>
+          <input
+            type="range"
+            min="0.6"
+            max="3.0"
+            step="0.2"
+            bind:value={linkThickness}
+            class="w-full accent-indigo-500 cursor-pointer h-1.5 bg-white/10 rounded-lg"
+          />
+        </div>
+      </div>
+    </div>
+  {/if}
 
   <!-- Toolbar Kontrol Sudut Kanan Atas -->
   <div class="absolute right-4 top-4 flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-900/80 p-1.5 backdrop-blur-md shadow-xl text-white">

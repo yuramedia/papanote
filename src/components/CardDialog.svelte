@@ -13,6 +13,7 @@
   import HistoryPanel from './HistoryPanel.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import BacklinksPanel from './BacklinksPanel.svelte';
+  import LocalGraphPanel from './LocalGraphPanel.svelte';
   import WikilinkPreviewPopover from './WikilinkPreviewPopover.svelte';
   import type { BoardStore } from '../lib/board.svelte';
   import type { Card } from '../lib/types';
@@ -413,6 +414,15 @@
 
           <!-- Panel Tautan Balik (Obsidian Backlinks) -->
           <BacklinksPanel
+            currentCard={card}
+            {store}
+            onnavigate={(targetId) => {
+              router.go(`/board/${store.board?.id}/card/${targetId}`);
+            }}
+          />
+
+          <!-- Panel Graf Lokal (Obsidian Local Graph) -->
+          <LocalGraphPanel
             currentCard={card}
             {store}
             onnavigate={(targetId) => {
