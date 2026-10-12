@@ -18,11 +18,13 @@
   import Sparkles from '@lucide/svelte/icons/sparkles';
   import Table2 from '@lucide/svelte/icons/table-2';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+  import Timer from '@lucide/svelte/icons/timer';
   import { router } from '../lib/router.svelte';
   import type { BoardStore } from '../lib/board.svelte';
   import { searchCards, type SearchCardResult } from '../lib/omnisearch';
   import { filterCommands, type PaletteCommand } from '../lib/commands';
   import { getTagColor } from '../lib/tags';
+  import { pomodoro } from '../lib/pomodoro.svelte';
 
   let {
     open = $bindable(false),
@@ -209,6 +211,65 @@
         iconName: 'template',
         action: () => {
           onCreateFromTemplate?.('feature-spec');
+        },
+      },
+      {
+        id: 'pomodoro-start',
+        title: 'Mulai Timer Fokus Pomodoro (25 Menit)',
+        description: 'Mulai sesi kerja fokus intensif dengan timer 25 menit',
+        category: 'Fokus',
+        shortcut: 'Pomodoro',
+        keywords: ['pomodoro', 'fokus', 'focus', 'timer', 'kerja', 'waktu'],
+        iconName: 'timer',
+        action: () => {
+          pomodoro.switchMode('focus');
+          pomodoro.start();
+        },
+      },
+      {
+        id: 'pomodoro-toggle',
+        title: 'Jeda / Lanjutkan Timer Pomodoro',
+        description: 'Ubah status timer pomodoro yang sedang berjalan',
+        category: 'Fokus',
+        keywords: ['jeda', 'pause', 'play', 'lanjutkan', 'pomodoro', 'timer'],
+        iconName: 'timer',
+        action: () => {
+          pomodoro.toggle();
+        },
+      },
+      {
+        id: 'pomodoro-short-break',
+        title: 'Mulai Istirahat Singkat Pomodoro (5 Menit)',
+        description: 'Ambil jeda istirahat pendek sejenak untuk menyegarkan pikiran',
+        category: 'Fokus',
+        keywords: ['istirahat', 'break', 'rehat', 'kopi', '5 menit', 'short break'],
+        iconName: 'timer',
+        action: () => {
+          pomodoro.switchMode('short_break');
+          pomodoro.start();
+        },
+      },
+      {
+        id: 'pomodoro-long-break',
+        title: 'Mulai Istirahat Panjang Pomodoro (15 Menit)',
+        description: 'Ambil jeda istirahat panjang setelah menyelesaikan beberapa siklus fokus',
+        category: 'Fokus',
+        keywords: ['istirahat panjang', 'long break', 'santai', '15 menit'],
+        iconName: 'timer',
+        action: () => {
+          pomodoro.switchMode('long_break');
+          pomodoro.start();
+        },
+      },
+      {
+        id: 'pomodoro-reset',
+        title: 'Reset Timer Pomodoro',
+        description: 'Kembalikan timer ke durasi awal dan hentikan hitungan mundur',
+        category: 'Fokus',
+        keywords: ['reset', 'ulang', 'stop', 'hentikan', 'pomodoro'],
+        iconName: 'timer',
+        action: () => {
+          pomodoro.reset();
         },
       },
       {
@@ -459,6 +520,8 @@
                       <Table2 class="size-4" />
                     {:else if cmd.iconName === 'template'}
                       <LayoutTemplate class="size-4" />
+                    {:else if cmd.iconName === 'timer'}
+                      <Timer class="size-4" />
                     {:else if cmd.iconName === 'plus' || cmd.iconName === 'list-plus'}
                       <Plus class="size-4" />
                     {:else if cmd.iconName === 'export'}

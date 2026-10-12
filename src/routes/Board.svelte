@@ -30,6 +30,7 @@
   import BoardVisibilityDialog from '../components/BoardVisibilityDialog.svelte';
   import QuickSwitcherModal from '../components/QuickSwitcherModal.svelte';
   import TemplatePickerModal from '../components/TemplatePickerModal.svelte';
+  import PomodoroWidget from '../components/PomodoroWidget.svelte';
   import { BoardStore } from '../lib/board.svelte';
   import { supabase } from '../lib/supabase';
   import { auth } from '../lib/auth.svelte';
@@ -300,6 +301,8 @@
         </span>
       </button>
     {/if}
+
+    <PomodoroWidget {store} onopenCard={openCardById} />
 
     <button
       class="btn bg-white/10 text-white hover:bg-white/20 text-xs py-1.5 px-3"

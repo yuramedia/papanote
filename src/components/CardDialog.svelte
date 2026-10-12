@@ -29,10 +29,16 @@
   import Bug from '@lucide/svelte/icons/bug';
   import Rocket from '@lucide/svelte/icons/rocket';
   import Sun from '@lucide/svelte/icons/sun';
+  import Timer from '@lucide/svelte/icons/timer';
+  import Play from '@lucide/svelte/icons/play';
+  import Pause from '@lucide/svelte/icons/pause';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+  import BookmarkCheck from '@lucide/svelte/icons/bookmark-check';
   import { extractTags, getTagColor } from '../lib/tags';
   import { router } from '../lib/router.svelte';
   import TemplatePickerModal from './TemplatePickerModal.svelte';
   import { getBuiltinTemplates, applyTemplate, type NoteTemplate } from '../lib/templates';
+  import { pomodoro } from '../lib/pomodoro.svelte';
 
   let { card, store, onclose }: { card: Card; store: BoardStore; onclose: () => void } = $props();
 
@@ -45,6 +51,9 @@
   let confirmOpen = $state(false);
   // Mode tampilan catatan: preview (Obsidian view) vs edit (Markdown raw)
   let mode = $state<'preview' | 'edit'>('preview');
+
+  // Status timer Pomodoro pada kartu ini
+  const isFocusingOnThisCard = $derived(pomodoro.cardId === card.id && pomodoro.status !== 'idle');
 
   // Modal template catatan
   let templateModalOpen = $state(false);
@@ -773,6 +782,75 @@
             <p class="mt-2 text-xs text-slate-500">
               Pengingat 24 jam &amp; 1 jam sebelum tenggat, serta saat kartu diubah anggota lain.
             </p>
+          </div>
+
+          <!-- Panel Focus & Pomodoro Tracker -->
+          <div class="rounded-xl border border-rose-200/80 bg-rose-50/50 p-3">
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <span class="flex items-center gap-1.5 text-xs font-semibold text-rose-900">
+                <Timer class="size-4 text-rose-600" /> Sesi Fokus Pomodoro
+              </span>
+              {#if isFocusingOnThisCard}
+                <span class="inline-flex items-center gap-1 rounded-full bg-rose-600/20 px-2 py-0.5 text-[10px] font-semibold text-rose-700 animate-pulse">
+                  Aktif
+                </span>
+              {/if}
+            </div>
+
+            {#if isFocusingOnThisCard}
+              <div class="text-center py-1">
+                <div class="text-2xl font-black font-mono tracking-tight text-rose-950">
+                  {pomodoro.formattedTime}
+                </div>
+                <div class="w-full bg-rose-200 rounded-full h-1.5 my-1.5 overflow-hidden">
+                  <div
+                    class="h-full bg-rose-600 transition-all duration-300 rounded-full"
+                    style="width: {pomodoro.progress}%"
+                  ></div>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1.5 mt-2">
+                <button
+                  type="button"
+                  onclick={() => pomodoro.toggle()}
+                  class="flex-1 btn bg-rose-600 hover:bg-rose-700 text-white text-xs py-1.5 px-2 font-medium cursor-pointer"
+                >
+                  {#if pomodoro.isRunning}
+                    <Pause class="size-3.5" /> Jeda
+                  {:else}
+                    <Play class="size-3.5" /> Lanjutkan
+                  {/if}
+                </button>
+                <button
+                  type="button"
+                  onclick={() => pomodoro.reset()}
+                  class="btn border border-rose-200 bg-white hover:bg-rose-100 text-rose-700 text-xs p-1.5 cursor-pointer"
+                  title="Reset timer"
+                >
+                  <RotateCcw class="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onclick={() => pomodoro.logSessionToCard(store, card.id)}
+                  class="btn border border-rose-200 bg-white hover:bg-rose-100 text-rose-700 text-xs p-1.5 cursor-pointer"
+                  title="Catat sesi fokus ke dalam catatan"
+                >
+                  <BookmarkCheck class="size-3.5" />
+                </button>
+              </div>
+            {:else}
+              <p class="text-xs text-rose-800/80 mb-2 leading-relaxed">
+                Tetapkan fokus 25 menit untuk mengerjakan catatan ini tanpa distraksi.
+              </p>
+              <button
+                type="button"
+                onclick={() => pomodoro.start(card.id, card.title)}
+                class="w-full btn bg-rose-600 hover:bg-rose-700 text-white text-xs py-1.5 font-medium shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Play class="size-3.5" /> Mulai Fokus (25m)
+              </button>
+            {/if}
           </div>
 
           <div class="text-xs text-slate-500">
