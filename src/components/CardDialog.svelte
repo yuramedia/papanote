@@ -23,6 +23,8 @@
   import { enablePush, pushMessage } from '../lib/push';
   import { toast } from '../lib/toast.svelte';
   import { renderMarkdown } from '../lib/markdown';
+  import Tag from '@lucide/svelte/icons/tag';
+  import { extractTags, getTagColor } from '../lib/tags';
   import { router } from '../lib/router.svelte';
 
   let { card, store, onclose }: { card: Card; store: BoardStore; onclose: () => void } = $props();
@@ -41,6 +43,36 @@
   let isUploadingImage = $state(false);
   let fileInputEl = $state<HTMLInputElement | null>(null);
   const coverUrl = $derived(extractFirstImage(content));
+
+  // Sistem Tagar & Label
+  const activeCardTags = $derived(extractTags(content));
+  const quickTags = $derived.by<string[]>(() => {
+    const list = store.allTags.map((t) => t.tag);
+    const defaults = ['urgent', 'p1', 'wip', 'done', 'idea', 'review'];
+    const merged = Array.from(new Set([...list, ...defaults]));
+    return merged.slice(0, 8);
+  });
+
+  function insertTag(tagName: string) {
+    const tagText = `#${tagName} `;
+    if (!textareaEl) {
+      content = content ? `${content} ${tagText}` : tagText;
+      save({ content });
+      return;
+    }
+    const start = textareaEl.selectionStart ?? content.length;
+    const end = textareaEl.selectionEnd ?? content.length;
+    const before = content.slice(0, start);
+    const after = content.slice(end);
+    const needLeadingSpace = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
+    content = before + (needLeadingSpace ? ' ' : '') + tagText + after;
+    save({ content });
+    setTimeout(() => {
+      textareaEl?.focus();
+      const pos = start + tagText.length + (needLeadingSpace ? 1 : 0);
+      textareaEl?.setSelectionRange(pos, pos);
+    }, 10);
+  }
 
   // Autocomplete Wikilinks [[
   let textareaEl = $state<HTMLTextAreaElement | null>(null);
@@ -240,6 +272,16 @@
   let closeTimer: number | null = null;
 
   function handleWikilinkClick(e: MouseEvent) {
+    const tagEl = (e.target as HTMLElement).closest('[data-tag]') as HTMLElement | null;
+    if (tagEl) {
+      const tagName = tagEl.getAttribute('data-tag');
+      if (tagName) {
+        store.toggleTag(tagName);
+        toast.show(`Filter tag #${tagName} diaktifkan di papan.`, 'info');
+      }
+      return;
+    }
+
     const target = (e.target as HTMLElement).closest('[data-wikilink]') as HTMLElement | null;
     if (!target) return;
     e.preventDefault();
@@ -337,6 +379,16 @@
           <Dialog.Description class="mt-1 px-1 text-xs text-slate-500">
             di list <span class="font-medium text-slate-700">{listTitle}</span> · Diunggah {formatDateTime(card.uploaded_at)}
           </Dialog.Description>
+          {#if activeCardTags.length > 0}
+            <div class="mt-2 flex flex-wrap items-center gap-1.5 px-1">
+              {#each activeCardTags as t (t)}
+                {@const style = getTagColor(t)}
+                <span class="inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-xs font-medium border {style.bg} {style.text} {style.border}">
+                  <span class="opacity-60">#</span>{t}
+                </span>
+              {/each}
+            </div>
+          {/if}
         </div>
         <span class="flex h-8 items-center gap-1 text-xs text-slate-500" aria-live="polite">
           {#if saveState === 'saving'}<LoaderCircle class="size-3.5 animate-spin" /> Menyimpan…
@@ -415,6 +467,26 @@
             </div>
           {:else}
             <div class="relative space-y-1.5">
+              <!-- Bar Saran Tag Cepat -->
+              <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+                <span class="text-slate-400 text-[11px] font-medium shrink-0 flex items-center gap-1">
+                  <Tag class="size-3 text-slate-400" />
+                  Saran tag:
+                </span>
+                {#each quickTags as qt (qt)}
+                  {@const style = getTagColor(qt)}
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] font-medium border transition cursor-pointer {style.bg} {style.text} {style.border} hover:opacity-80 shrink-0"
+                    onclick={() => insertTag(qt)}
+                    title={`Sisipkan #${qt}`}
+                  >
+                    <Plus class="size-2.5 opacity-60" />
+                    <span class="opacity-60">#</span>{qt}
+                  </button>
+                {/each}
+              </div>
+
               <textarea
                 id="card-content"
                 bind:this={textareaEl}

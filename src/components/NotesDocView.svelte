@@ -25,10 +25,12 @@
   import Database from '@lucide/svelte/icons/database';
   import Settings from '@lucide/svelte/icons/settings';
   import ImageIcon from '@lucide/svelte/icons/image';
+  import Tag from '@lucide/svelte/icons/tag';
   import type { BoardStore } from '../lib/board.svelte';
   import type { Card } from '../lib/types';
   import { renderMarkdown } from '../lib/markdown';
   import { uploadAttachment, insertImageMarkdown } from '../lib/attachments';
+  import { extractTags, getTagColor } from '../lib/tags';
   import { toast } from '../lib/toast.svelte';
 
   let {
@@ -46,6 +48,9 @@
 
   // Folder collapse state (listId -> boolean)
   let collapsedFolders = $state<Record<string, boolean>>({});
+
+  // Tags section collapse state
+  let tagsSectionCollapsed = $state(false);
 
   // Active Card ID di editor dokumen
   let activeCardId = $state<string | null>(null);
@@ -323,8 +328,48 @@
     }, 10);
   }
 
-  // Klik wikilink di mode preview
+  // Sistem Tagar Catatan
+  const currentCardTags = $derived(extractTags(activeContent));
+  const quickTags = $derived.by<string[]>(() => {
+    const list = store.allTags.map((t) => t.tag);
+    const defaults = ['urgent', 'p1', 'wip', 'done', 'idea', 'review'];
+    const merged = Array.from(new Set([...list, ...defaults]));
+    return merged.slice(0, 8);
+  });
+
+  function insertTagInDoc(tagName: string) {
+    const tagText = `#${tagName} `;
+    if (!textareaEl) {
+      activeContent = activeContent ? `${activeContent} ${tagText}` : tagText;
+      triggerAutoSave();
+      return;
+    }
+    const start = textareaEl.selectionStart ?? activeContent.length;
+    const end = textareaEl.selectionEnd ?? activeContent.length;
+    const before = activeContent.slice(0, start);
+    const after = activeContent.slice(end);
+    const needLeadingSpace = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
+    activeContent = before + (needLeadingSpace ? ' ' : '') + tagText + after;
+    triggerAutoSave();
+    setTimeout(() => {
+      textareaEl?.focus();
+      const pos = start + tagText.length + (needLeadingSpace ? 1 : 0);
+      textareaEl?.setSelectionRange(pos, pos);
+    }, 10);
+  }
+
+  // Klik wikilink & tag di mode preview
   function handlePreviewWikilinkClick(e: MouseEvent) {
+    const tagEl = (e.target as HTMLElement).closest('[data-tag]') as HTMLElement | null;
+    if (tagEl) {
+      const tagName = tagEl.getAttribute('data-tag');
+      if (tagName) {
+        store.toggleTag(tagName);
+        toast.show(`Filter tag #${tagName} diaktifkan di papan.`, 'info');
+      }
+      return;
+    }
+
     const target = (e.target as HTMLElement).closest('[data-wikilink]') as HTMLElement | null;
     if (!target) return;
     e.preventDefault();
@@ -549,22 +594,96 @@
               <div class="ml-3 pl-2 border-l border-[#2a2a2a] mt-0.5 space-y-0.5">
                 {#each cardsInList as card (card.id)}
                   {@const isActive = activeCardId === card.id}
-                  <button
-                    type="button"
-                    class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs transition cursor-pointer {isActive
-                      ? 'bg-[#2c2c2c] text-white font-medium shadow-sm'
-                      : 'text-slate-400 hover:bg-[#222222] hover:text-slate-200'}"
-                    onclick={() => selectCard(card.id)}
-                  >
-                    <FileText class="size-3.5 shrink-0 {isActive ? 'text-indigo-400' : 'text-slate-500'}" />
-                    <span class="truncate">{card.title}</span>
-                  </button>
+                  {@const cardTags = extractTags(card.content)}
+                  {@const matchesTag = store.activeTags.length === 0 || store.activeTags.every((t) => cardTags.includes(t))}
+                  {#if matchesTag}
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-xs transition cursor-pointer {isActive
+                        ? 'bg-[#2c2c2c] text-white font-medium shadow-sm'
+                        : 'text-slate-400 hover:bg-[#222222] hover:text-slate-200'}"
+                      onclick={() => selectCard(card.id)}
+                    >
+                      <div class="flex items-center gap-2 truncate">
+                        <FileText class="size-3.5 shrink-0 {isActive ? 'text-indigo-400' : 'text-slate-500'}" />
+                        <span class="truncate">{card.title}</span>
+                      </div>
+                      {#if cardTags.length > 0}
+                        <div class="flex items-center gap-1 shrink-0 ml-1">
+                          {#each cardTags.slice(0, 1) as t (t)}
+                            {@const style = getTagColor(t)}
+                            <span class="size-1.5 rounded-full" style="background-color: {style.dotHex}" title={`#${t}`}></span>
+                          {/each}
+                        </div>
+                      {/if}
+                    </button>
+                  {/if}
                 {/each}
               </div>
             {/if}
           </div>
         {/each}
       </div>
+
+      <!-- Tags Section (Tag Explorer ala Obsidian) -->
+      {#if store.allTags.length > 0}
+        <div class="border-t border-[#252525] p-2 shrink-0">
+          <div
+            class="flex items-center justify-between px-1.5 py-1 text-slate-400 hover:text-slate-200 transition cursor-pointer select-none"
+            onclick={() => (tagsSectionCollapsed = !tagsSectionCollapsed)}
+            role="button"
+            tabindex="0"
+            onkeydown={(e) => e.key === 'Enter' && (tagsSectionCollapsed = !tagsSectionCollapsed)}
+          >
+            <span class="flex items-center gap-1.5 uppercase tracking-wider text-[10px] font-semibold">
+              <Tag class="size-3 text-indigo-400" />
+              <span>Tags</span>
+              <span class="text-slate-500 font-normal">({store.allTags.length})</span>
+            </span>
+            <span class="text-slate-500">
+              {#if tagsSectionCollapsed}
+                <ChevronRight class="size-3.5" />
+              {:else}
+                <ChevronDown class="size-3.5" />
+              {/if}
+            </span>
+          </div>
+
+          {#if !tagsSectionCollapsed}
+            <div class="mt-1 space-y-0.5 max-h-44 overflow-y-auto no-scrollbar">
+              {#each store.allTags as { tag, count } (tag)}
+                {@const isSelected = store.activeTags.includes(tag)}
+                {@const style = getTagColor(tag)}
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-xs transition cursor-pointer {isSelected
+                    ? 'bg-indigo-600/30 text-indigo-200 font-medium'
+                    : 'text-slate-400 hover:bg-[#252525] hover:text-slate-200'}"
+                  onclick={() => store.toggleTag(tag)}
+                  title={`Filter #${tag} (${count} catatan)`}
+                >
+                  <span class="flex items-center gap-1.5 truncate">
+                    <span class="size-1.5 rounded-full shrink-0" style="background-color: {style.dotHex}"></span>
+                    <span class="truncate">#{tag}</span>
+                  </span>
+                  <span class="text-[10px] rounded px-1.5 py-0.2 {isSelected ? 'bg-indigo-500/40 text-indigo-100' : 'bg-[#222222] text-slate-500'}">
+                    {count}
+                  </span>
+                </button>
+              {/each}
+              {#if store.activeTags.length > 0}
+                <button
+                  type="button"
+                  class="mt-1 w-full text-center text-[10px] text-indigo-300 hover:text-indigo-200 py-0.5 cursor-pointer underline"
+                  onclick={() => store.clearTags()}
+                >
+                  Reset Filter Tag ({store.activeTags.length})
+                </button>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {/if}
 
       <!-- Footer Sidebar: Vault Name -->
       <div class="flex h-9 items-center justify-between border-t border-[#252525] px-3 text-[11px] text-slate-400">
@@ -712,10 +831,41 @@
             bind:value={activeTitle}
             oninput={triggerAutoSave}
             placeholder="Judul Catatan…"
-            class="w-full bg-transparent text-3xl sm:text-4xl font-bold tracking-tight text-white placeholder:text-slate-600 border-none outline-none mb-6"
+            class="w-full bg-transparent text-3xl sm:text-4xl font-bold tracking-tight text-white placeholder:text-slate-600 border-none outline-none mb-3"
           />
 
+          {#if currentCardTags.length > 0}
+            <div class="mb-5 flex flex-wrap items-center gap-1.5">
+              {#each currentCardTags as t (t)}
+                {@const style = getTagColor(t)}
+                <span class="inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-xs font-medium border {style.bg} {style.text} {style.border} shadow-2xs">
+                  <span class="opacity-60">#</span>{t}
+                </span>
+              {/each}
+            </div>
+          {/if}
+
           {#if editorMode === 'edit'}
+            <!-- Bar Saran Tag Cepat -->
+            <div class="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+              <span class="text-slate-500 text-[11px] font-medium shrink-0 flex items-center gap-1">
+                <Tag class="size-3 text-slate-500" />
+                Saran tag:
+              </span>
+              {#each quickTags as qt (qt)}
+                {@const style = getTagColor(qt)}
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] font-medium border transition cursor-pointer {style.bg} {style.text} {style.border} hover:opacity-80 shrink-0"
+                  onclick={() => insertTagInDoc(qt)}
+                  title={`Sisipkan #${qt}`}
+                >
+                  <Plus class="size-2.5 opacity-60" />
+                  <span class="opacity-60">#</span>{qt}
+                </button>
+              {/each}
+            </div>
+
             <!-- Mode Edit: Seamless Textarea -->
             <div class="relative">
               <textarea
@@ -847,6 +997,13 @@
       </div>
 
       <div class="flex items-center gap-3 text-slate-400">
+        {#if currentCardTags.length > 0}
+          <span class="flex items-center gap-1 text-indigo-300">
+            <Tag class="size-2.5" />
+            <span>{currentCardTags.length} tags</span>
+          </span>
+          <span class="text-slate-600">&bull;</span>
+        {/if}
         <span>{stats.backlinks} backlinks</span>
         <span class="text-slate-600">&bull;</span>
         <span>{stats.words} kata</span>

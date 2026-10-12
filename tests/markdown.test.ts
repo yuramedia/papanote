@@ -27,6 +27,20 @@ describe('renderMarkdown', () => {
     expect(html).toContain('Dokumen Utama');
   });
 
+  test('render Obsidian-style #tag dengan chip berwarna', () => {
+    const html = renderMarkdown('Kerjakan tugas #urgent dan #proyek/ui segera');
+    expect(html).toContain('obsidian-tag');
+    expect(html).toContain('data-tag="urgent"');
+    expect(html).toContain('data-tag="proyek/ui"');
+  });
+
+  test('mengabaikan heading dan hex color saat render tag', () => {
+    const html = renderMarkdown('# Judul\n\nWarna background: #ffffff');
+    expect(html).toContain('<h1>Judul</h1>');
+    expect(html).not.toContain('data-tag="judul"');
+    expect(html).not.toContain('data-tag="ffffff"');
+  });
+
   test('placeholder saat konten kosong', () => {
     const html = renderMarkdown('');
     expect(html).toContain('Belum ada catatan');

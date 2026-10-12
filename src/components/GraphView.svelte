@@ -11,6 +11,7 @@
   import Sparkles from '@lucide/svelte/icons/sparkles';
   import type { BoardStore } from '../lib/board.svelte';
   import type { Card } from '../lib/types';
+  import { filterCardsByTags } from '../lib/tags';
 
   let { store, onopen }: { store: BoardStore; onopen: (id: string) => void } = $props();
 
@@ -112,6 +113,9 @@
     let activeCards = store.cards.filter((c) => !c.deleted_at);
     if (selectedLists.length > 0) {
       activeCards = activeCards.filter((c) => selectedLists.includes(c.list_id));
+    }
+    if (store.activeTags.length > 0) {
+      activeCards = filterCardsByTags(activeCards, store.activeTags);
     }
 
     const cardMap = new Map<string, Card>();
@@ -660,6 +664,7 @@
     // pantau dependensi reaktif
     const _c = store.cards.length;
     const _l = store.lists.length;
+    const _t = store.activeTags.join(',');
     const _orphans = showOrphans;
     const _scale = nodeScale;
     const _lists = selectedLists.join(',');

@@ -15,6 +15,8 @@
   import Lock from '@lucide/svelte/icons/lock';
   import Users from '@lucide/svelte/icons/users';
   import Search from '@lucide/svelte/icons/search';
+  import Tag from '@lucide/svelte/icons/tag';
+  import X from '@lucide/svelte/icons/x';
   import TopBar from '../components/TopBar.svelte';
   import ListColumn from '../components/ListColumn.svelte';
   import CardDialog from '../components/CardDialog.svelte';
@@ -31,6 +33,7 @@
   import { router } from '../lib/router.svelte';
   import { toast } from '../lib/toast.svelte';
   import { canAccessBoard, canManageBoardVisibility, getUserBoardRole } from '../lib/board-access';
+  import { getTagColor } from '../lib/tags';
   import type { BoardVisibility, List } from '../lib/types';
 
   let { boardId, cardId }: { boardId: string; cardId?: string } = $props();
@@ -267,50 +270,91 @@
         </button>
       </div>
     </div>
-  {:else if viewMode === 'kanban'}
-    <main class="flex flex-1 items-start gap-3 overflow-x-auto p-4">
-      {#each store.sortedLists as list, i (list.id)}
-        <ListColumn
-          {list}
-          {store}
-          isFirst={i === 0}
-          isLast={i === store.sortedLists.length - 1}
-          onopen={openCardById}
-          ondelete={(l) => {
-            listToDelete = l;
-            confirmOpen = true;
-          }}
-        />
-      {/each}
-
-      <form onsubmit={addList} class="w-72 shrink-0 rounded-2xl bg-white/15 p-2 backdrop-blur">
-        <input
-          class="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-white placeholder:text-white/70 focus:border-white/40 focus:bg-white/10 focus:outline-none"
-          placeholder="+ Tambah list baru"
-          bind:value={newList}
-          maxlength="120"
-        />
-        {#if newList.trim()}
-          <button class="btn-primary mt-2" type="submit"><Plus class="size-4" /> Tambah list</button>
-        {/if}
-      </form>
-    </main>
-  {:else if viewMode === 'notes'}
-    <div class="flex flex-1 overflow-hidden">
-      <NotesDocView {store} onopen={openCardById} onSwitchView={(v) => (viewMode = v)} />
-    </div>
-  {:else if viewMode === 'calendar'}
-    <div class="flex flex-1 overflow-hidden">
-      <CalendarView {store} onopen={openCardById} />
-    </div>
-  {:else if viewMode === 'graph'}
-    <div class="flex flex-1 overflow-hidden">
-      <GraphView {store} onopen={openCardById} />
-    </div>
   {:else}
-    <div class="flex flex-1 overflow-hidden">
-      <CanvasView {store} onopen={openCardById} />
-    </div>
+    {#if store.allTags.length > 0 && viewMode !== 'notes'}
+      <div class="flex items-center gap-2 px-4 py-1.5 bg-black/25 border-b border-white/10 backdrop-blur-md overflow-x-auto text-xs shrink-0 no-scrollbar">
+        <span class="text-white/70 font-medium flex items-center gap-1.5 shrink-0">
+          <Tag class="size-3.5 text-indigo-300" />
+          <span class="hidden sm:inline">Tags:</span>
+        </span>
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+          {#each store.allTags as item (item.tag)}
+            {@const isSelected = store.activeTags.includes(item.tag)}
+            {@const style = getTagColor(item.tag)}
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition cursor-pointer border {isSelected
+                ? 'bg-white text-slate-900 border-white shadow-sm ring-2 ring-indigo-400 font-semibold'
+                : `${style.bg} ${style.text} ${style.border} hover:opacity-90`}"
+              onclick={() => store.toggleTag(item.tag)}
+              title={`Filter tag #${item.tag}`}
+            >
+              <span class="opacity-60">#</span>
+              <span>{item.tag}</span>
+              <span class="ml-0.5 px-1 py-0.2 rounded-full text-[10px] {isSelected ? 'bg-slate-200 text-slate-800' : 'bg-black/10 text-current'}">
+                {item.count}
+              </span>
+            </button>
+          {/each}
+        </div>
+        {#if store.activeTags.length > 0}
+          <button
+            type="button"
+            class="flex items-center gap-1 text-xs text-indigo-200 hover:text-white underline ml-auto shrink-0 cursor-pointer"
+            onclick={() => store.clearTags()}
+          >
+            <X class="size-3" />
+            <span>Reset ({store.activeTags.length})</span>
+          </button>
+        {/if}
+      </div>
+    {/if}
+
+    {#if viewMode === 'kanban'}
+      <main class="flex flex-1 items-start gap-3 overflow-x-auto p-4">
+        {#each store.sortedLists as list, i (list.id)}
+          <ListColumn
+            {list}
+            {store}
+            isFirst={i === 0}
+            isLast={i === store.sortedLists.length - 1}
+            onopen={openCardById}
+            ondelete={(l) => {
+              listToDelete = l;
+              confirmOpen = true;
+            }}
+          />
+        {/each}
+
+        <form onsubmit={addList} class="w-72 shrink-0 rounded-2xl bg-white/15 p-2 backdrop-blur">
+          <input
+            class="w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-white placeholder:text-white/70 focus:border-white/40 focus:bg-white/10 focus:outline-none"
+            placeholder="+ Tambah list baru"
+            bind:value={newList}
+            maxlength="120"
+          />
+          {#if newList.trim()}
+            <button class="btn-primary mt-2" type="submit"><Plus class="size-4" /> Tambah list</button>
+          {/if}
+        </form>
+      </main>
+    {:else if viewMode === 'notes'}
+      <div class="flex flex-1 overflow-hidden">
+        <NotesDocView {store} onopen={openCardById} onSwitchView={(v) => (viewMode = v)} />
+      </div>
+    {:else if viewMode === 'calendar'}
+      <div class="flex flex-1 overflow-hidden">
+        <CalendarView {store} onopen={openCardById} />
+      </div>
+    {:else if viewMode === 'graph'}
+      <div class="flex flex-1 overflow-hidden">
+        <GraphView {store} onopen={openCardById} />
+      </div>
+    {:else}
+      <div class="flex flex-1 overflow-hidden">
+        <CanvasView {store} onopen={openCardById} />
+      </div>
+    {/if}
   {/if}
 </div>
 

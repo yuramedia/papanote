@@ -3,13 +3,23 @@
   import CalendarClock from '@lucide/svelte/icons/calendar-clock';
   import { deadlineState, formatDate, formatDateTime } from '../lib/format';
   import { extractFirstImage, cleanSnippet } from '../lib/attachments';
+  import { extractTags, getTagColor } from '../lib/tags';
   import type { Card } from '../lib/types';
 
-  let { card, onopen }: { card: Card; onopen: (id: string) => void } = $props();
+  let {
+    card,
+    onopen,
+    onTagClick,
+  }: {
+    card: Card;
+    onopen: (id: string) => void;
+    onTagClick?: (tag: string) => void;
+  } = $props();
 
   const state = $derived(deadlineState(card.deadline_date));
   const coverUrl = $derived(extractFirstImage(card.content));
   const snippet = $derived(cleanSnippet(card.content));
+  const tags = $derived(extractTags(card.content));
 
   const badge = {
     none: '',
@@ -43,6 +53,40 @@
         {snippet}
       </p>
     {/if}
+
+    {#if tags.length > 0}
+      <div class="mt-2 flex flex-wrap items-center gap-1">
+        {#each tags.slice(0, 3) as tag (tag)}
+          {@const style = getTagColor(tag)}
+          <span
+            role="button"
+            tabindex="0"
+            class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium border transition cursor-pointer {style.bg} {style.text} {style.border} hover:opacity-80"
+            onclick={(e) => {
+              if (onTagClick) {
+                e.stopPropagation();
+                onTagClick(tag);
+              }
+            }}
+            onkeydown={(e) => {
+              if (e.key === 'Enter' && onTagClick) {
+                e.stopPropagation();
+                onTagClick(tag);
+              }
+            }}
+            title={`Filter #${tag}`}
+          >
+            <span class="opacity-60">#</span>{tag}
+          </span>
+        {/each}
+        {#if tags.length > 3}
+          <span class="rounded bg-slate-100 px-1 py-0.5 text-[10px] font-medium text-slate-500">
+            +{tags.length - 3}
+          </span>
+        {/if}
+      </div>
+    {/if}
+
     <div class="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
       <span class="text-slate-400" title="Diunggah {formatDateTime(card.uploaded_at)}">
         {formatDate(card.uploaded_at)}

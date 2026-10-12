@@ -24,6 +24,7 @@
     SHORT_DAY_NAMES_ID,
   } from '../lib/calendar';
   import { deadlineState, formatDate } from '../lib/format';
+  import { filterCardsByTags, extractTags, getTagColor } from '../lib/tags';
   import { toast } from '../lib/toast.svelte';
 
   let { store, onopen }: { store: BoardStore; onopen: (id: string) => void } = $props();
@@ -108,11 +109,15 @@
 
   // Kartu aktif yang terfilter
   const activeCards = $derived.by<Card[]>(() => {
-    return store.cards.filter((c) => {
+    let list = store.cards.filter((c) => {
       if (c.deleted_at) return false;
       if (selectedListId !== 'all' && c.list_id !== selectedListId) return false;
       return true;
     });
+    if (store.activeTags.length > 0) {
+      list = filterCardsByTags(list, store.activeTags);
+    }
+    return list;
   });
 
   // Kartu yang dikelompokkan berdasarkan tanggal deadline (Key: YYYY-MM-DD)
@@ -142,13 +147,17 @@
   // Kartu tanpa deadline
   const unscheduledCards = $derived.by<Card[]>(() => {
     const q = unscheduledSearch.trim().toLowerCase();
-    return store.cards.filter((c) => {
+    let list = store.cards.filter((c) => {
       if (c.deleted_at) return false;
       if (c.deadline_date) return false;
       if (selectedListId !== 'all' && c.list_id !== selectedListId) return false;
       if (q && !c.title.toLowerCase().includes(q)) return false;
       return true;
     });
+    if (store.activeTags.length > 0) {
+      list = filterCardsByTags(list, store.activeTags);
+    }
+    return list;
   });
 
   // Format jam deadline (HH:mm)

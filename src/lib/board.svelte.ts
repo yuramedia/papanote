@@ -4,6 +4,7 @@ import { auth } from './auth.svelte';
 import { toast } from './toast.svelte';
 import { byPosition, mergeRow } from './merge';
 import { evenPositions, needsRebalance, positionBetween } from './fractional';
+import { getAllTagsWithCount, filterCardsByTags, type TagCount } from './tags';
 import type { Board, Card, List } from './types';
 
 const nowIso = () => new Date().toISOString();
@@ -16,8 +17,10 @@ export class BoardStore {
   loading = $state(true);
   error = $state<string | null>(null);
   connected = $state(false);
+  activeTags = $state<string[]>([]);
 
   sortedLists = $derived([...this.lists].sort(byPosition));
+  allTags = $derived<TagCount[]>(getAllTagsWithCount(this.cards));
 
   #channel: RealtimeChannel | null = null;
   #boardId: string;
@@ -26,8 +29,22 @@ export class BoardStore {
     this.#boardId = boardId;
   }
 
+  toggleTag(tag: string) {
+    const normalized = tag.toLowerCase().replace(/^#/, '');
+    if (this.activeTags.includes(normalized)) {
+      this.activeTags = this.activeTags.filter((t) => t !== normalized);
+    } else {
+      this.activeTags = [...this.activeTags, normalized];
+    }
+  }
+
+  clearTags() {
+    this.activeTags = [];
+  }
+
   cardsFor(listId: string): Card[] {
-    return this.cards.filter((c) => c.list_id === listId).sort(byPosition);
+    const listCards = this.cards.filter((c) => c.list_id === listId).sort(byPosition);
+    return filterCardsByTags(listCards, this.activeTags);
   }
 
   findCard(id: string): Card | undefined {

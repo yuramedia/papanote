@@ -101,7 +101,7 @@
   >
     {#each items as card (card.id)}
       <div animate:flip={{ duration: FLIP_MS }}>
-        <CardItem {card} {onopen} />
+        <CardItem {card} {onopen} onTagClick={(t) => store.toggleTag(t)} />
       </div>
     {/each}
   </div>
