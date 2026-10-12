@@ -29,6 +29,7 @@
   import TableView from '../components/TableView.svelte';
   import BoardVisibilityDialog from '../components/BoardVisibilityDialog.svelte';
   import QuickSwitcherModal from '../components/QuickSwitcherModal.svelte';
+  import TemplatePickerModal from '../components/TemplatePickerModal.svelte';
   import { BoardStore } from '../lib/board.svelte';
   import { supabase } from '../lib/supabase';
   import { auth } from '../lib/auth.svelte';
@@ -36,6 +37,7 @@
   import { toast } from '../lib/toast.svelte';
   import { canAccessBoard, canManageBoardVisibility, getUserBoardRole } from '../lib/board-access';
   import { getTagColor } from '../lib/tags';
+  import { getBuiltinTemplates, applyTemplate, type NoteTemplate } from '../lib/templates';
   import type { BoardVisibility, List } from '../lib/types';
 
   let { boardId, cardId }: { boardId: string; cardId?: string } = $props();
@@ -50,6 +52,7 @@
   let listToDelete = $state<List | null>(null);
   let confirmOpen = $state(false);
   let visibilityOpen = $state(false);
+  let templatePickerOpen = $state(false);
 
   const openCard = $derived(cardId ? store.findCard(cardId) : undefined);
 
@@ -87,6 +90,35 @@
     }
     const newCard = await store.addCard(targetList.id, 'Catatan Baru');
     if (newCard) {
+      openCardById(newCard.id);
+    }
+  }
+
+  async function handleCreateFromTemplate(templateId: string) {
+    const t = getBuiltinTemplates().find((item) => item.id === templateId);
+    if (!t) return;
+    const targetList = store.sortedLists[0];
+    if (!targetList) {
+      toast.show('Buat list terlebih dahulu sebelum menambah catatan.', 'info');
+      return;
+    }
+    const applied = applyTemplate(t);
+    const newCard = await store.addCard(targetList.id, applied.title);
+    if (newCard) {
+      await store.updateCard(newCard.id, { content: applied.content });
+      openCardById(newCard.id);
+    }
+  }
+
+  async function handleTemplateAppliedFromBoard(res: { title: string; content: string; template: NoteTemplate }) {
+    const targetList = store.sortedLists[0];
+    if (!targetList) {
+      toast.show('Buat list terlebih dahulu sebelum menambah catatan.', 'info');
+      return;
+    }
+    const newCard = await store.addCard(targetList.id, res.title);
+    if (newCard) {
+      await store.updateCard(newCard.id, { content: res.content });
       openCardById(newCard.id);
     }
   }
@@ -416,6 +448,13 @@
   }}
   onExportDocx={exportDocx}
   onOpenVisibility={() => (visibilityOpen = true)}
+  onCreateFromTemplate={handleCreateFromTemplate}
+  onOpenTemplates={() => (templatePickerOpen = true)}
+/>
+
+<TemplatePickerModal
+  bind:open={templatePickerOpen}
+  onapply={handleTemplateAppliedFromBoard}
 />
 
 <BoardVisibilityDialog

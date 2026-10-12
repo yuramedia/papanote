@@ -2,7 +2,7 @@ export interface PaletteCommand {
   id: string;
   title: string;
   description?: string;
-  category: 'Tampilan' | 'Aksi' | 'Papan' | 'Filter';
+  category: 'Tampilan' | 'Aksi' | 'Papan' | 'Filter' | 'Template';
   shortcut?: string;
   keywords?: string[];
   iconName:
@@ -12,6 +12,7 @@ export interface PaletteCommand {
     | 'graph'
     | 'canvas'
     | 'table'
+    | 'template'
     | 'plus'
     | 'list-plus'
     | 'export'

@@ -24,8 +24,15 @@
   import { toast } from '../lib/toast.svelte';
   import { renderMarkdown } from '../lib/markdown';
   import Tag from '@lucide/svelte/icons/tag';
+  import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+  import Users from '@lucide/svelte/icons/users';
+  import Bug from '@lucide/svelte/icons/bug';
+  import Rocket from '@lucide/svelte/icons/rocket';
+  import Sun from '@lucide/svelte/icons/sun';
   import { extractTags, getTagColor } from '../lib/tags';
   import { router } from '../lib/router.svelte';
+  import TemplatePickerModal from './TemplatePickerModal.svelte';
+  import { getBuiltinTemplates, applyTemplate, type NoteTemplate } from '../lib/templates';
 
   let { card, store, onclose }: { card: Card; store: BoardStore; onclose: () => void } = $props();
 
@@ -38,6 +45,35 @@
   let confirmOpen = $state(false);
   // Mode tampilan catatan: preview (Obsidian view) vs edit (Markdown raw)
   let mode = $state<'preview' | 'edit'>('preview');
+
+  // Modal template catatan
+  let templateModalOpen = $state(false);
+
+  function applyQuickTemplate(templateId: string) {
+    const t = getBuiltinTemplates().find((item) => item.id === templateId);
+    if (!t) return;
+    const res = applyTemplate(t, { currentContent: content, append: false });
+    const patch: Partial<Pick<Card, 'title' | 'content'>> = { content: res.content };
+    content = res.content;
+    if (!title.trim() || title === 'Catatan Baru' || title === 'Note') {
+      title = res.title;
+      patch.title = res.title;
+    }
+    mode = 'edit';
+    save(patch);
+    toast.success(`Template "${t.name}" diterapkan.`);
+  }
+
+  function handleTemplateApplied(res: { title: string; content: string; template: NoteTemplate }) {
+    const patch: Partial<Pick<Card, 'title' | 'content'>> = { content: res.content };
+    content = res.content;
+    if (!title.trim() || title === 'Catatan Baru' || title === 'Note') {
+      title = res.title;
+      patch.title = res.title;
+    }
+    mode = 'edit';
+    save(patch);
+  }
 
   // Lampiran Gambar & Cover Kartu
   let isUploadingImage = $state(false);
@@ -407,6 +443,16 @@
             <div class="flex items-center gap-2">
               <button
                 type="button"
+                onclick={() => (templateModalOpen = true)}
+                class="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 transition cursor-pointer"
+                title="Buka pilihan template catatan (Notula Rapat, Bug Report, dll)"
+              >
+                <LayoutTemplate class="size-3.5 text-indigo-600" />
+                <span class="hidden sm:inline">Template</span>
+              </button>
+
+              <button
+                type="button"
                 onclick={() => fileInputEl?.click()}
                 disabled={isUploadingImage}
                 class="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
@@ -448,23 +494,93 @@
           </div>
 
           {#if mode === 'preview'}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <!-- svelte-ignore a11y_mouse_events_have_key_events -->
-            <div
-              class="markdown-body min-h-64 rounded-xl border border-slate-200 bg-slate-50/60 p-4 transition hover:border-slate-300 cursor-text select-text"
-              onclick={handleWikilinkClick}
-              ondblclick={() => (mode = 'edit')}
-              onmouseover={handleWikilinkMouseOver}
-              onmouseleave={handleWikilinkMouseLeave}
-              title="Klik dua kali untuk mengedit isi catatan"
-            >
-              {@html renderMarkdown(content)}
-            </div>
-            <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
-              <span>Klik dua kali untuk mengedit</span>
-              <span>Mendukung syntax Markdown &amp; wikilinks <code>[[Nama Catatan]]</code></span>
-            </div>
+            {#if !content.trim()}
+              <!-- Empty State Template Selector -->
+              <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center">
+                <div class="mx-auto grid size-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600 mb-2.5">
+                  <LayoutTemplate class="size-5" />
+                </div>
+                <h4 class="text-sm font-semibold text-slate-800">Catatan Masih Kosong</h4>
+                <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                  Mulai menulis dokumen baru atau gunakan struktur template siap pakai berikut:
+                </p>
+
+                <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onclick={() => applyQuickTemplate('meeting-notes')}
+                    class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:border-indigo-300 hover:text-indigo-600 transition cursor-pointer"
+                  >
+                    <Users class="size-3.5 text-indigo-500" />
+                    <span>Notula Rapat</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onclick={() => applyQuickTemplate('bug-report')}
+                    class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:border-indigo-300 hover:text-indigo-600 transition cursor-pointer"
+                  >
+                    <Bug class="size-3.5 text-rose-500" />
+                    <span>Laporan Bug</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onclick={() => applyQuickTemplate('project-kickoff')}
+                    class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:border-indigo-300 hover:text-indigo-600 transition cursor-pointer"
+                  >
+                    <Rocket class="size-3.5 text-amber-500" />
+                    <span>Project Kickoff</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onclick={() => applyQuickTemplate('daily-standup')}
+                    class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:border-indigo-300 hover:text-indigo-600 transition cursor-pointer"
+                  >
+                    <Sun class="size-3.5 text-amber-500" />
+                    <span>Daily Standup</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onclick={() => (templateModalOpen = true)}
+                    class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
+                  >
+                    <LayoutTemplate class="size-3.5" />
+                    <span>Semua Template…</span>
+                  </button>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-200/60">
+                  <button
+                    type="button"
+                    onclick={() => (mode = 'edit')}
+                    class="text-xs font-medium text-indigo-600 hover:text-indigo-700 underline cursor-pointer"
+                  >
+                    Atau mulai menulis dokumen kosong &rarr;
+                  </button>
+                </div>
+              </div>
+            {:else}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <!-- svelte-ignore a11y_mouse_events_have_key_events -->
+              <div
+                class="markdown-body min-h-64 rounded-xl border border-slate-200 bg-slate-50/60 p-4 transition hover:border-slate-300 cursor-text select-text"
+                onclick={handleWikilinkClick}
+                ondblclick={() => (mode = 'edit')}
+                onmouseover={handleWikilinkMouseOver}
+                onmouseleave={handleWikilinkMouseLeave}
+                title="Klik dua kali untuk mengedit isi catatan"
+              >
+                {@html renderMarkdown(content)}
+              </div>
+              <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Klik dua kali untuk mengedit</span>
+                <span>Mendukung syntax Markdown &amp; wikilinks <code>[[Nama Catatan]]</code></span>
+              </div>
+            {/if}
           {:else}
             <div class="relative space-y-1.5">
               <!-- Bar Saran Tag Cepat -->
@@ -700,4 +816,11 @@
     onclose();
     await store.updateCard(card.id, { deleted_at: new Date().toISOString() });
   }}
+/>
+
+<TemplatePickerModal
+  bind:open={templateModalOpen}
+  currentContent={content}
+  currentTitle={title}
+  onapply={handleTemplateApplied}
 />

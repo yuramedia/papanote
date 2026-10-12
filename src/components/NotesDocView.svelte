@@ -28,12 +28,19 @@
   import ImageIcon from '@lucide/svelte/icons/image';
   import Tag from '@lucide/svelte/icons/tag';
   import Terminal from '@lucide/svelte/icons/terminal';
+  import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+  import Users from '@lucide/svelte/icons/users';
+  import Bug from '@lucide/svelte/icons/bug';
+  import Rocket from '@lucide/svelte/icons/rocket';
+  import Sun from '@lucide/svelte/icons/sun';
   import type { BoardStore } from '../lib/board.svelte';
   import type { Card } from '../lib/types';
   import { renderMarkdown } from '../lib/markdown';
   import { uploadAttachment, insertImageMarkdown } from '../lib/attachments';
   import { extractTags, getTagColor } from '../lib/tags';
   import { toast } from '../lib/toast.svelte';
+  import TemplatePickerModal from './TemplatePickerModal.svelte';
+  import { getBuiltinTemplates, applyTemplate, type NoteTemplate } from '../lib/templates';
 
   let {
     store,
@@ -251,6 +258,53 @@
       editorMode = 'edit';
       await tick();
       textareaEl?.focus();
+    }
+  }
+
+  let templateModalOpen = $state(false);
+
+  async function createNoteFromTemplate(templateId: string) {
+    const t = getBuiltinTemplates().find((item) => item.id === templateId);
+    if (!t) return;
+    const targetList = store.sortedLists[0];
+    if (!targetList) {
+      toast.error('Buat list terlebih dahulu.');
+      return;
+    }
+    const applied = applyTemplate(t);
+    const created = await store.addCard(targetList.id, applied.title);
+    if (created) {
+      await store.updateCard(created.id, { content: applied.content });
+      selectCard(created.id);
+      activeContent = applied.content;
+      activeTitle = applied.title;
+      editorMode = 'edit';
+      toast.success(`Catatan baru dibuat dari template "${t.name}".`);
+    }
+  }
+
+  async function handleTemplateAppliedInVault(res: { title: string; content: string; template: NoteTemplate }) {
+    if (activeCardId) {
+      activeContent = res.content;
+      if (!activeTitle.trim() || activeTitle === 'Untitled Note' || activeTitle === 'Catatan Baru') {
+        activeTitle = res.title;
+      }
+      editorMode = 'edit';
+      triggerAutoSave();
+    } else {
+      const targetList = store.sortedLists[0];
+      if (!targetList) {
+        toast.error('Buat list terlebih dahulu.');
+        return;
+      }
+      const created = await store.addCard(targetList.id, res.title);
+      if (created) {
+        await store.updateCard(created.id, { content: res.content });
+        selectCard(created.id);
+        activeContent = res.content;
+        activeTitle = res.title;
+        editorMode = 'edit';
+      }
     }
   }
 
@@ -778,6 +832,16 @@
       <div class="flex items-center gap-1.5">
         <button
           type="button"
+          onclick={() => (templateModalOpen = true)}
+          class="flex items-center gap-1 rounded-md bg-[#252525] hover:bg-[#303030] px-2 py-1 text-[11px] font-medium text-slate-300 transition cursor-pointer"
+          title="Buka pilihan template catatan (Notula Rapat, Bug Report, dll)"
+        >
+          <LayoutTemplate class="size-3 text-indigo-400" />
+          <span class="hidden sm:inline">Template</span>
+        </button>
+
+        <button
+          type="button"
           onclick={() => fileInputEl?.click()}
           disabled={isUploadingImage || !activeCardId}
           class="flex items-center gap-1 rounded-md bg-[#252525] hover:bg-[#303030] px-2 py-1 text-[11px] font-medium text-slate-300 transition cursor-pointer disabled:opacity-40"
@@ -986,14 +1050,63 @@
           <p class="text-sm text-slate-400 leading-relaxed mb-6">
             Pilih catatan dari sidebar kiri atau buat catatan baru untuk mulai menulis ide dan menghubungkannya dengan tautan [[wikilinks]].
           </p>
-          <button
-            type="button"
-            class="flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition cursor-pointer"
-            onclick={createQuickNote}
-          >
-            <FilePlus class="size-4" />
-            <span>Buat Catatan Baru</span>
-          </button>
+          <div class="flex flex-col items-center gap-3 w-full">
+            <button
+              type="button"
+              class="flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition cursor-pointer"
+              onclick={createQuickNote}
+            >
+              <FilePlus class="size-4" />
+              <span>Buat Catatan Kosong</span>
+            </button>
+
+            <!-- Quick Template Starters -->
+            <div class="pt-3 border-t border-[#2a2a2a] w-full">
+              <p class="text-[11px] text-slate-500 mb-2">Atau mulai dari template terstruktur:</p>
+              <div class="flex flex-wrap items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  onclick={() => createNoteFromTemplate('meeting-notes')}
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-[#333333] bg-[#222222] px-2.5 py-1 text-xs text-slate-300 hover:border-indigo-500 hover:text-white transition cursor-pointer"
+                >
+                  <Users class="size-3 text-indigo-400" />
+                  <span>Notula Rapat</span>
+                </button>
+                <button
+                  type="button"
+                  onclick={() => createNoteFromTemplate('bug-report')}
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-[#333333] bg-[#222222] px-2.5 py-1 text-xs text-slate-300 hover:border-indigo-500 hover:text-white transition cursor-pointer"
+                >
+                  <Bug class="size-3 text-rose-400" />
+                  <span>Laporan Bug</span>
+                </button>
+                <button
+                  type="button"
+                  onclick={() => createNoteFromTemplate('project-kickoff')}
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-[#333333] bg-[#222222] px-2.5 py-1 text-xs text-slate-300 hover:border-indigo-500 hover:text-white transition cursor-pointer"
+                >
+                  <Rocket class="size-3 text-amber-400" />
+                  <span>Project Kickoff</span>
+                </button>
+                <button
+                  type="button"
+                  onclick={() => createNoteFromTemplate('daily-standup')}
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-[#333333] bg-[#222222] px-2.5 py-1 text-xs text-slate-300 hover:border-indigo-500 hover:text-white transition cursor-pointer"
+                >
+                  <Sun class="size-3 text-amber-400" />
+                  <span>Daily Standup</span>
+                </button>
+                <button
+                  type="button"
+                  onclick={() => (templateModalOpen = true)}
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-950/40 px-2.5 py-1 text-xs font-semibold text-indigo-300 hover:bg-indigo-900/50 transition cursor-pointer"
+                >
+                  <LayoutTemplate class="size-3" />
+                  <span>Semua Template…</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       {/if}
     </div>
@@ -1035,3 +1148,10 @@
     </footer>
   </main>
 </div>
+
+<TemplatePickerModal
+  bind:open={templateModalOpen}
+  currentContent={activeContent}
+  currentTitle={activeTitle}
+  onapply={handleTemplateAppliedInVault}
+/>

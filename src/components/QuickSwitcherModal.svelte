@@ -17,6 +17,7 @@
   import Home from '@lucide/svelte/icons/home';
   import Sparkles from '@lucide/svelte/icons/sparkles';
   import Table2 from '@lucide/svelte/icons/table-2';
+  import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import { router } from '../lib/router.svelte';
   import type { BoardStore } from '../lib/board.svelte';
   import { searchCards, type SearchCardResult } from '../lib/omnisearch';
@@ -33,6 +34,8 @@
     onNewList,
     onExportDocx,
     onOpenVisibility,
+    onCreateFromTemplate,
+    onOpenTemplates,
   }: {
     open?: boolean;
     store: BoardStore;
@@ -43,6 +46,8 @@
     onNewList?: () => void;
     onExportDocx?: () => void;
     onOpenVisibility?: () => void;
+    onCreateFromTemplate?: (templateId: string) => void;
+    onOpenTemplates?: () => void;
   } = $props();
 
   let query = $state('');
@@ -137,6 +142,73 @@
         iconName: 'plus',
         action: () => {
           onNewCard?.();
+        },
+      },
+      {
+        id: 'action-open-templates',
+        title: 'Buka Koleksi Template Catatan (Template Library)',
+        description: 'Pilih, pratinjau, atau buat template kustom baru',
+        category: 'Template',
+        shortcut: 'Templates',
+        keywords: ['template', 'pilih template', 'koleksi template', 'kustom', 'library'],
+        iconName: 'template',
+        action: () => {
+          onOpenTemplates?.();
+        },
+      },
+      {
+        id: 'template-meeting',
+        title: 'Buat Catatan: Notula Rapat (Meeting Notes)',
+        description: 'Template notula rapat lengkap dengan agenda, peserta, dan action items',
+        category: 'Template',
+        keywords: ['meeting', 'rapat', 'notula', 'agenda', 'action item'],
+        iconName: 'template',
+        action: () => {
+          onCreateFromTemplate?.('meeting-notes');
+        },
+      },
+      {
+        id: 'template-bug',
+        title: 'Buat Catatan: Laporan Bug (Bug Report)',
+        description: 'Template pelaporan bug dengan langkah reproduksi dan lingkungan',
+        category: 'Template',
+        keywords: ['bug', 'error', 'issue', 'laporan bug', 'defect'],
+        iconName: 'template',
+        action: () => {
+          onCreateFromTemplate?.('bug-report');
+        },
+      },
+      {
+        id: 'template-project',
+        title: 'Buat Catatan: Rencana Proyek (Project Kickoff)',
+        description: 'Template perencanaan proyek dengan target milestone dan mitigasi risiko',
+        category: 'Template',
+        keywords: ['project', 'kickoff', 'proyek', 'rencana', 'milestone', 'planning'],
+        iconName: 'template',
+        action: () => {
+          onCreateFromTemplate?.('project-kickoff');
+        },
+      },
+      {
+        id: 'template-standup',
+        title: 'Buat Catatan: Daily Standup & Jurnal Kerja',
+        description: 'Template jurnal harian: kemarin, hari ini, dan hambatan tim',
+        category: 'Template',
+        keywords: ['standup', 'daily', 'harian', 'jurnal', 'yesterday', 'today'],
+        iconName: 'template',
+        action: () => {
+          onCreateFromTemplate?.('daily-standup');
+        },
+      },
+      {
+        id: 'template-spec',
+        title: 'Buat Catatan: Spesifikasi Fitur (PRD / Feature Spec)',
+        description: 'Dokumen spesifikasi produk, user problem, dan kriteria keberhasilan',
+        category: 'Template',
+        keywords: ['spec', 'prd', 'fitur', 'feature', 'spesifikasi', 'desain'],
+        iconName: 'template',
+        action: () => {
+          onCreateFromTemplate?.('feature-spec');
         },
       },
       {
@@ -385,6 +457,8 @@
                       <Layers class="size-4" />
                     {:else if cmd.iconName === 'table'}
                       <Table2 class="size-4" />
+                    {:else if cmd.iconName === 'template'}
+                      <LayoutTemplate class="size-4" />
                     {:else if cmd.iconName === 'plus' || cmd.iconName === 'list-plus'}
                       <Plus class="size-4" />
                     {:else if cmd.iconName === 'export'}
