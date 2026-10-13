@@ -27,6 +27,7 @@ export function cleanSnippet(content: string | null | undefined): string {
     .replace(/<img[^>]*>/gi, '')
     .replace(/^#+\s+/gm, '')
     .replace(/\[\[(.*?)\]\]/g, '$1')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 

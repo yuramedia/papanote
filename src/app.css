@@ -19,6 +19,9 @@
   body,
   #app {
     height: 100%;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
   }
   body {
     @apply bg-slate-100 text-slate-800 antialiased;

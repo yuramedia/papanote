@@ -160,75 +160,75 @@
   }
 </script>
 
-<div class="flex h-full flex-col bg-gradient-to-br from-brand-700 via-brand-800 to-slate-900">
+<div class="flex h-full w-full max-w-full flex-col overflow-hidden bg-gradient-to-br from-brand-700 via-brand-800 to-slate-900">
   <TopBar title={store.board?.title ?? ''}>
     {#snippet leftControls()}
       <div class="flex items-center rounded-xl bg-white/10 p-1 text-xs">
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'notes'
+          class="flex items-center gap-1.5 rounded-lg px-2 xl:px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'notes'
             ? 'bg-indigo-600 text-white shadow-sm'
             : 'text-white/70 hover:text-white'}"
           onclick={() => (viewMode = 'notes')}
           title="Tampilan Dokumen Workspace Ala Obsidian"
         >
           <FileText class="size-3.5" />
-          <span class="hidden sm:inline">Notes</span>
+          <span class="{viewMode === 'notes' ? 'inline' : 'hidden 2xl:inline'}">Notes</span>
         </button>
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'kanban'
+          class="flex items-center gap-1.5 rounded-lg px-2 xl:px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'kanban'
             ? 'bg-white text-slate-900 shadow-sm'
             : 'text-white/70 hover:text-white'}"
           onclick={() => (viewMode = 'kanban')}
           title="Tampilan Kanban Board"
         >
           <Kanban class="size-3.5" />
-          <span class="hidden sm:inline">Kanban</span>
+          <span class="{viewMode === 'kanban' ? 'inline' : 'hidden 2xl:inline'}">Kanban</span>
         </button>
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'calendar'
+          class="flex items-center gap-1.5 rounded-lg px-2 xl:px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'calendar'
             ? 'bg-indigo-600 text-white shadow-sm'
             : 'text-white/70 hover:text-white'}"
           onclick={() => (viewMode = 'calendar')}
           title="Tampilan Kalender & Timeline"
         >
           <CalendarIcon class="size-3.5" />
-          <span class="hidden sm:inline">Calendar</span>
+          <span class="{viewMode === 'calendar' ? 'inline' : 'hidden 2xl:inline'}">Calendar</span>
         </button>
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'graph'
+          class="flex items-center gap-1.5 rounded-lg px-2 xl:px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'graph'
             ? 'bg-indigo-600 text-white shadow-sm'
             : 'text-white/70 hover:text-white'}"
           onclick={() => (viewMode = 'graph')}
           title="Tampilan Obsidian Graph View"
         >
           <Network class="size-3.5" />
-          <span class="hidden sm:inline">Graph</span>
+          <span class="{viewMode === 'graph' ? 'inline' : 'hidden 2xl:inline'}">Graph</span>
         </button>
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'canvas'
+          class="flex items-center gap-1.5 rounded-lg px-2 xl:px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'canvas'
             ? 'bg-indigo-600 text-white shadow-sm'
             : 'text-white/70 hover:text-white'}"
           onclick={() => (viewMode = 'canvas')}
           title="Tampilan Obsidian Infinite Canvas"
         >
           <Layers class="size-3.5" />
-          <span class="hidden sm:inline">Canvas</span>
+          <span class="{viewMode === 'canvas' ? 'inline' : 'hidden 2xl:inline'}">Canvas</span>
         </button>
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'table'
+          class="flex items-center gap-1.5 rounded-lg px-2 xl:px-2.5 py-1 font-medium transition-colors cursor-pointer {viewMode === 'table'
             ? 'bg-indigo-600 text-white shadow-sm'
             : 'text-white/70 hover:text-white'}"
           onclick={() => (viewMode = 'table')}
           title="Tampilan Database Tabel ala Notion"
         >
           <Table2 class="size-3.5" />
-          <span class="hidden sm:inline">Table</span>
+          <span class="{viewMode === 'table' ? 'inline' : 'hidden 2xl:inline'}">Table</span>
         </button>
       </div>
     {/snippet}
@@ -269,19 +269,19 @@
       {@const myBoardRole = getUserBoardRole(store.board, auth.user, auth.isAdmin)}
       <button
         type="button"
-        class="btn bg-white/10 hover:bg-white/20 text-white text-xs py-1.5 px-2.5 flex items-center gap-1.5 cursor-pointer"
+        class="btn bg-white/10 hover:bg-white/20 text-white text-xs py-1.5 px-2 sm:px-2.5 flex items-center gap-1.5 cursor-pointer shrink-0"
         onclick={() => (visibilityOpen = true)}
         title={canManageBoardVisibility(store.board, auth.user, auth.isAdmin) ? 'Ubah hak akses & visibilitas papan' : 'Status visibilitas papan'}
       >
         {#if store.board.visibility === 'private'}
           <Lock class="size-3.5 text-amber-300" />
-          <span class="hidden md:inline">Pribadi</span>
+          <span class="hidden 2xl:inline">Pribadi</span>
         {:else if store.board.visibility === 'members'}
           <Users class="size-3.5 text-indigo-300" />
-          <span class="hidden md:inline">{store.board.member_ids?.length || 1} Anggota</span>
+          <span class="hidden 2xl:inline">{store.board.member_ids?.length || 1} Anggota</span>
         {:else}
           <Globe class="size-3.5 text-emerald-300" />
-          <span class="hidden md:inline">Semua Tim</span>
+          <span class="hidden 2xl:inline">Semua Tim</span>
         {/if}
         <span
           class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.2 text-[10px] font-semibold {myBoardRole === 'owner'
@@ -292,11 +292,11 @@
           title={`Peran Anda di papan ini: ${myBoardRole}`}
         >
           {#if myBoardRole === 'owner'}
-            👑 Owner
+            👑 <span class="hidden sm:inline">Owner</span>
           {:else if myBoardRole === 'admin'}
-            🛡️ Admin
+            🛡️ <span class="hidden sm:inline">Admin</span>
           {:else}
-            👤 User
+            👤 <span class="hidden sm:inline">User</span>
           {/if}
         </span>
       </button>
@@ -305,12 +305,13 @@
     <PomodoroWidget {store} onopenCard={openCardById} />
 
     <button
-      class="btn bg-white/10 text-white hover:bg-white/20 text-xs py-1.5 px-3"
+      class="btn bg-white/10 text-white hover:bg-white/20 text-xs py-1.5 px-2.5 sm:px-3 shrink-0"
       onclick={exportDocx}
       disabled={exporting || !store.board}
+      title="Ekspor Papan ke Dokumen Word (.docx)"
     >
       {#if exporting}<LoaderCircle class="size-4 animate-spin" />{:else}<FileDown class="size-4" />{/if}
-      <span class="hidden md:inline">Ekspor Word</span>
+      <span class="hidden 2xl:inline">Ekspor Word</span>
     </button>
   </TopBar>
 
@@ -383,7 +384,7 @@
     {/if}
 
     {#if viewMode === 'kanban'}
-      <main class="flex flex-1 items-start gap-3 overflow-x-auto p-4">
+      <main class="flex flex-1 items-start gap-3 overflow-x-auto p-4 w-full min-w-0">
         {#each store.sortedLists as list, i (list.id)}
           <ListColumn
             {list}

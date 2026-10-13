@@ -260,7 +260,7 @@
           <!-- Kolom Judul -->
           <th
             scope="col"
-            class="px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer min-w-[260px] max-w-sm"
+            class="px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer min-w-[240px] max-w-md"
             onclick={() => toggleSort('title')}
           >
             <div class="flex items-center gap-1.5">
@@ -372,13 +372,13 @@
 
             <tr class="group hover:bg-white/5 transition-colors">
               <!-- 1. Judul Catatan -->
-              <td class="px-4 py-2.5">
+              <td class="px-4 py-2.5 max-w-xs sm:max-w-md">
                 <div
                   role="button"
                   tabindex="0"
                   onclick={() => onopen(card.id)}
                   onkeydown={(e) => e.key === 'Enter' && onopen(card.id)}
-                  class="flex items-center gap-3 cursor-pointer text-left"
+                  class="flex items-center gap-3 cursor-pointer text-left min-w-0"
                 >
                   {#if coverUrl}
                     <div class="size-8 shrink-0 overflow-hidden rounded-lg bg-slate-800 border border-white/10">
@@ -391,11 +391,11 @@
                   {/if}
 
                   <div class="min-w-0 flex-1">
-                    <p class="font-medium text-white group-hover:text-indigo-300 transition-colors truncate text-xs sm:text-[13px]">
+                    <p class="font-medium text-white group-hover:text-indigo-300 transition-colors truncate text-xs sm:text-[13px]" title={card.title}>
                       {card.title}
                     </p>
                     {#if snippet}
-                      <p class="truncate font-mono text-[11px] text-white/40 mt-0.5">
+                      <p class="truncate font-mono text-[11px] text-white/40 mt-0.5" title={snippet}>
                         {snippet}
                       </p>
                     {/if}
