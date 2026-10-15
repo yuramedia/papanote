@@ -5,6 +5,7 @@
   import Plus from '@lucide/svelte/icons/plus';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import Trash2 from '@lucide/svelte/icons/trash-2';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
   import Globe from '@lucide/svelte/icons/globe';
   import Lock from '@lucide/svelte/icons/lock';
@@ -21,18 +22,22 @@
   import { byPosition, mergeRow } from '../lib/merge';
   import { positionBetween } from '../lib/fractional';
   import { formatDate } from '../lib/format';
+  import { formatDeletedRelativeTime } from '../lib/trash';
   import { canAccessBoard, canManageBoardVisibility, getUserBoardRole } from '../lib/board-access';
   import type { Board, BoardVisibility } from '../lib/types';
 
   let boards = $state<Board[]>([]);
+  let deletedBoards = $state<Board[]>([]);
   let loading = $state(true);
   let newTitle = $state('');
   let newVisibility = $state<BoardVisibility>('public');
   let toDelete = $state<Board | null>(null);
   let confirmOpen = $state(false);
+  let permanentDeleteBoardItem = $state<Board | null>(null);
+  let confirmPermanentBoardOpen = $state(false);
   let visibilityBoard = $state<Board | null>(null);
   let visibilityOpen = $state(false);
-  let filterTab = $state<'all' | 'mine' | 'shared'>('all');
+  let filterTab = $state<'all' | 'mine' | 'shared' | 'trash'>('all');
   let channel: RealtimeChannel | null = null;
 
   const sorted = $derived([...boards].sort(byPosition));
@@ -56,6 +61,14 @@
     const { data, error } = await supabase().from('boards').select('*').is('deleted_at', null);
     if (error) toast.error(error.message);
     boards = data ?? [];
+
+    const { data: delData } = await supabase()
+      .from('boards')
+      .select('*')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false });
+    deletedBoards = delData ?? [];
+
     loading = false;
     channel = supabase()
       .channel('boards:all')
@@ -108,14 +121,48 @@
 
   async function update(id: string, patch: Partial<Pick<Board, 'title' | 'deleted_at'>>) {
     const before = boards.find((b) => b.id === id);
+    if (patch.deleted_at && before) {
+      deletedBoards = [{ ...before, deleted_at: patch.deleted_at }, ...deletedBoards];
+    }
     boards = patch.deleted_at
       ? boards.filter((b) => b.id !== id)
       : boards.map((b) => (b.id === id ? { ...b, ...patch, updated_at: new Date().toISOString() } : b));
     const { error } = await supabase().from('boards').update(patch).eq('id', id);
     if (error && before) {
       boards = [...boards.filter((b) => b.id !== id), before];
+      if (patch.deleted_at) {
+        deletedBoards = deletedBoards.filter((b) => b.id !== id);
+      }
       toast.error(error.message);
     }
+  }
+
+  async function restoreBoard(board: Board) {
+    const now = new Date().toISOString();
+    const { error } = await supabase()
+      .from('boards')
+      .update({ deleted_at: null, updated_at: now })
+      .eq('id', board.id);
+    if (!error) {
+      deletedBoards = deletedBoards.filter((b) => b.id !== board.id);
+      boards = [...boards, { ...board, deleted_at: null, updated_at: now }];
+      toast.success(`Papan "${board.title}" berhasil dipulihkan.`);
+    } else {
+      toast.error('Gagal memulihkan papan: ' + error.message);
+    }
+  }
+
+  async function executePermanentBoardDelete() {
+    if (!permanentDeleteBoardItem) return;
+    const target = permanentDeleteBoardItem;
+    const { error } = await supabase().from('boards').delete().eq('id', target.id);
+    if (!error) {
+      deletedBoards = deletedBoards.filter((b) => b.id !== target.id);
+      toast.show(`Papan "${target.title}" telah dihapus secara permanen.`, 'info');
+    } else {
+      toast.error('Gagal menghapus papan: ' + error.message);
+    }
+    permanentDeleteBoardItem = null;
   }
 
   async function updateVisibility(
@@ -160,7 +207,7 @@
     </div>
 
     <!-- Filter Tab Papan (Semua / Papan Saya / Dibagikan) -->
-    {#if accessibleBoards.length > 0}
+    {#if accessibleBoards.length > 0 || deletedBoards.length > 0}
       <div class="mb-5 flex items-center gap-1.5 border-b border-slate-200 pb-2 text-xs">
         <button
           type="button"
@@ -189,10 +236,75 @@
         >
           Dibagikan ({accessibleBoards.filter((b) => b.created_by !== auth.user?.id).length})
         </button>
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-lg px-3 py-1 font-medium transition cursor-pointer {filterTab === 'trash'
+            ? 'bg-rose-600 text-white shadow-sm'
+            : 'text-slate-600 hover:bg-slate-100'}"
+          onclick={() => (filterTab = 'trash')}
+        >
+          <Trash2 class="size-3.5" />
+          <span>Sampah</span>
+          {#if deletedBoards.length > 0}
+            <span class="rounded-full px-1.5 py-0.2 text-[10px] {filterTab === 'trash' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700 font-semibold'}">
+              {deletedBoards.length}
+            </span>
+          {/if}
+        </button>
       </div>
     {/if}
 
-    {#if loading}
+    {#if filterTab === 'trash'}
+      {#if deletedBoards.length === 0}
+        <div class="rounded-2xl border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
+          <Trash2 class="mx-auto mb-3 size-8 text-slate-400" />
+          Kotak sampah papan kosong. Tidak ada papan yang dihapus.
+        </div>
+      {:else}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {#each deletedBoards as board (board.id)}
+            <div class="flex h-32 flex-col justify-between rounded-2xl border border-rose-300/60 bg-gradient-to-br from-slate-900 to-slate-800 p-4 text-white shadow-sm">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0 flex-1">
+                  <h3 class="font-semibold text-base truncate text-white">{board.title}</h3>
+                  <p class="text-xs text-rose-300/80 mt-1">
+                    🕒 Dihapus {formatDeletedRelativeTime(board.deleted_at)}
+                  </p>
+                </div>
+                <div class="grid size-7 place-items-center rounded-lg bg-rose-500/20 text-rose-400">
+                  <Trash2 class="size-4" />
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  class="flex items-center gap-1.5 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 px-3 py-1.5 text-xs font-semibold transition cursor-pointer"
+                  onclick={() => restoreBoard(board)}
+                  title="Pulihkan papan ini"
+                >
+                  <RotateCcw class="size-3.5" />
+                  <span>Pulihkan</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="flex items-center gap-1 rounded-lg text-rose-400/80 hover:bg-rose-500/20 hover:text-rose-300 px-2 py-1.5 text-xs transition cursor-pointer"
+                  onclick={() => {
+                    permanentDeleteBoardItem = board;
+                    confirmPermanentBoardOpen = true;
+                  }}
+                  title="Hapus permanen dari database"
+                >
+                  <Trash2 class="size-3.5" />
+                  <span>Hapus Permanen</span>
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    {:else if loading}
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {#each Array(3) as _, i (i)}
           <div class="h-28 animate-pulse rounded-2xl bg-slate-200"></div>
@@ -327,6 +439,13 @@
 <ConfirmDialog
   bind:open={confirmOpen}
   title="Hapus papan?"
-  description={`Papan "${toDelete?.title ?? ''}" akan disembunyikan dari semua anggota tim. Data tetap tersimpan di database internal.`}
+  description={`Papan "${toDelete?.title ?? ''}" akan dipindahkan ke kotak sampah. Papan dapat dipulihkan kembali kapan saja.`}
   onconfirm={() => toDelete && update(toDelete.id, { deleted_at: new Date().toISOString() })}
+/>
+
+<ConfirmDialog
+  bind:open={confirmPermanentBoardOpen}
+  title="Hapus Papan Secara Permanen?"
+  description={`Papan "${permanentDeleteBoardItem?.title ?? ''}" beserta seluruh list dan catatannya akan dihapus secara permanen dari server. Tindakan ini tidak dapat dibatalkan.`}
+  onconfirm={executePermanentBoardDelete}
 />

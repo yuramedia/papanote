@@ -31,6 +31,7 @@
   import QuickSwitcherModal from '../components/QuickSwitcherModal.svelte';
   import TemplatePickerModal from '../components/TemplatePickerModal.svelte';
   import PomodoroWidget from '../components/PomodoroWidget.svelte';
+  import TrashModal from '../components/TrashModal.svelte';
   import { BoardStore } from '../lib/board.svelte';
   import { supabase } from '../lib/supabase';
   import { auth } from '../lib/auth.svelte';
@@ -54,6 +55,7 @@
   let confirmOpen = $state(false);
   let visibilityOpen = $state(false);
   let templatePickerOpen = $state(false);
+  let trashOpen = $state(false);
 
   const openCard = $derived(cardId ? store.findCard(cardId) : undefined);
 
@@ -161,7 +163,7 @@
 </script>
 
 <div class="flex h-full w-full max-w-full flex-col overflow-hidden bg-gradient-to-br from-brand-700 via-brand-800 to-slate-900">
-  <TopBar title={store.board?.title ?? ''}>
+  <TopBar title={store.board?.title ?? ''} ontrash={() => (trashOpen = true)}>
     {#snippet leftControls()}
       <div class="flex items-center rounded-xl bg-white/10 p-1 text-xs">
         <button
@@ -454,6 +456,7 @@
   onOpenVisibility={() => (visibilityOpen = true)}
   onCreateFromTemplate={handleCreateFromTemplate}
   onOpenTemplates={() => (templatePickerOpen = true)}
+  onOpenTrash={() => (trashOpen = true)}
 />
 
 <TemplatePickerModal
@@ -465,6 +468,13 @@
   bind:open={visibilityOpen}
   board={store.board}
   onsave={updateBoardVisibility}
+/>
+
+<TrashModal
+  bind:open={trashOpen}
+  boardId={store.board?.id ?? boardId}
+  activeLists={store.sortedLists}
+  onrestore={() => store.load()}
 />
 
 <ConfirmDialog

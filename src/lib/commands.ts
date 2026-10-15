@@ -19,6 +19,7 @@ export interface PaletteCommand {
     | 'export'
     | 'users'
     | 'filter-x'
+    | 'trash'
     | 'home';
   action: () => void | Promise<void>;
 }

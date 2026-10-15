@@ -19,6 +19,7 @@
   import Table2 from '@lucide/svelte/icons/table-2';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Timer from '@lucide/svelte/icons/timer';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { router } from '../lib/router.svelte';
   import type { BoardStore } from '../lib/board.svelte';
   import { searchCards, type SearchCardResult } from '../lib/omnisearch';
@@ -38,6 +39,7 @@
     onOpenVisibility,
     onCreateFromTemplate,
     onOpenTemplates,
+    onOpenTrash,
   }: {
     open?: boolean;
     store: BoardStore;
@@ -50,6 +52,7 @@
     onOpenVisibility?: () => void;
     onCreateFromTemplate?: (templateId: string) => void;
     onOpenTemplates?: () => void;
+    onOpenTrash?: () => void;
   } = $props();
 
   let query = $state('');
@@ -319,6 +322,18 @@
         },
       },
       {
+        id: 'action-open-trash',
+        title: 'Buka Kotak Sampah Papan (Recycle Bin)',
+        description: 'Lihat, pulihkan, atau bersihkan catatan dan list yang telah dihapus',
+        category: 'Aksi',
+        shortcut: 'Sampah',
+        keywords: ['sampah', 'trash', 'recycle', 'pulihkan', 'restore', 'hapus', 'bin'],
+        iconName: 'trash',
+        action: () => {
+          onOpenTrash?.();
+        },
+      },
+      {
         id: 'nav-home',
         title: 'Kembali ke Daftar Papan (Beranda)',
         description: 'Navigasi kembali ke dashboard utama seluruh papan',
@@ -530,6 +545,8 @@
                       <RotateCcw class="size-4" />
                     {:else if cmd.iconName === 'users'}
                       <Users class="size-4" />
+                    {:else if cmd.iconName === 'trash'}
+                      <Trash2 class="size-4" />
                     {:else}
                       <Home class="size-4" />
                     {/if}

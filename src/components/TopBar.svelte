@@ -5,6 +5,7 @@
   import Settings from '@lucide/svelte/icons/settings';
   import Users from '@lucide/svelte/icons/users';
   import KeyRound from '@lucide/svelte/icons/key-round';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { auth } from '../lib/auth.svelte';
   import { router } from '../lib/router.svelte';
   import AdminUsersDialog from './AdminUsersDialog.svelte';
@@ -16,12 +17,14 @@
     leftControls,
     center,
     rightStatus,
+    ontrash,
     children,
   }: {
     title?: string;
     leftControls?: Snippet;
     center?: Snippet;
     rightStatus?: Snippet;
+    ontrash?: () => void;
     children?: Snippet;
   } = $props();
 
@@ -104,6 +107,17 @@
             >
               <Users class="size-4 text-amber-500" />
               <span>Kelola User Tim</span>
+            </DropdownMenu.Item>
+          {/if}
+
+          <!-- Opsi: Kotak Sampah Papan -->
+          {#if ontrash}
+            <DropdownMenu.Item
+              class="menu-item text-xs text-rose-600 data-highlighted:bg-rose-50"
+              onSelect={() => ontrash?.()}
+            >
+              <Trash2 class="size-4 text-rose-500" />
+              <span>Kotak Sampah Papan</span>
             </DropdownMenu.Item>
           {/if}
         </DropdownMenu.Content>
