@@ -13,43 +13,35 @@ Papan catatan visual tim ala Trello. **Supabase Cloud** dipakai sebagai cache, A
 
 ## Arsitektur
 
-```plantuml
-@startuml arsitektur_papanote
-!theme plain
-skinparam shadowing false
-skinparam roundcorner 8
-skinparam defaultFontName sans-serif
+```mermaid
+flowchart TD
+    User(("👤 Pengguna / Tim"))
 
-actor "Pengguna / Tim" as User
+    subgraph Client["🖥️ Client Side"]
+        Browser["Browser / Klien Aktif<br/><b>(Svelte 5 Statis SPA)</b>"]
+    end
 
-package "Client Side" {
-  component [Browser / Klien Aktif\n(Svelte 5 Statis SPA)] as Browser
-}
+    subgraph Cloud["☁️ Supabase Cloud (Free Tier)"]
+        SupabaseDB[("PostgreSQL Cache<br/>& State / Auth")]
+        SupabaseRealtime["Realtime WebSocket Broadcast"]
+    end
 
-cloud "Supabase Cloud (Free Tier)" as Cloud {
-  database "PostgreSQL\n(Cache, Auth & State)" as SupabaseDB
-  component "Realtime WebSocket" as SupabaseRealtime
-}
+    subgraph VPS["🏢 VPS (yura-infra)"]
+        Caddy["Caddy Web Server<br/>(file_server dist/)"]
+        Worker["papanote-worker<br/>(Bun Background Sync)"]
+        InternalDB[("PostgreSQL Internal<br/><b>Source of Truth</b>")]
+    end
 
-node "VPS (yura-infra)" {
-  component [Caddy Web Server\n(file_server dist/)] as Caddy
-  component [papanote-worker\n(Bun Background Sync)] as Worker
-  database "PostgreSQL Internal\n(Source of Truth)" as InternalDB
-}
+    User -->|Akses & Interaksi UI| Browser
+    Caddy -.->|Sajikan bundle statis| Browser
 
-' Relasi & Alur Data
-User --> Browser : Akses & interaksi UI
-Caddy ..> Browser : Sajikan static bundle (dist/)
+    Browser -->|Read & Write data kartu| SupabaseDB
+    SupabaseRealtime -->|Realtime sync ke semua browser| Browser
 
-Browser --> SupabaseDB : Read / Write data kartu
-SupabaseRealtime --> Browser : Realtime sync ke semua browser aktif
-
-Worker --> SupabaseDB : Pull berkala tiap 1 menit\n(service-role)
-Worker --> InternalDB : Sinkronisasi data\n(Last-Write-Wins)
-Worker --> Browser : Pengingat deadline (Web Push)
-Worker --> SupabaseDB : Cleanup harian 03:00 WIB\n(Purge cache terverifikasi)
-
-@enduml
+    Worker -->|Pull berkala tiap 1 menit| SupabaseDB
+    Worker -->|Sinkronisasi Last-Write-Wins| InternalDB
+    Worker -->|Pengingat deadline (Web Push)| Browser
+    Worker -->|Cleanup harian 03:00 WIB| SupabaseDB
 ```
 
 - **Frontend 100% Statis:** Disajikan langsung oleh Caddy web server di VPS (`file_server`), tanpa container web server Node/Bun. Sangat cepat, efisien, dan minim memory.
