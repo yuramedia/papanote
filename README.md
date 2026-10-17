@@ -13,14 +13,43 @@ Papan catatan visual tim ala Trello. **Supabase Cloud** dipakai sebagai cache, A
 
 ## Arsitektur
 
-```
-Browser (Svelte Statis) ──write & read──▶ Supabase ──realtime WebSocket──▶ semua browser aktif
-                                              ▲
-                                              │ (Pull tiap 1 menit via service-role)
-                                      papanote-worker (Bun di VPS)
-                                              ├─ sinkronisasi ke PostgreSQL internal
-                                              ├─ pengingat deadline tiap 1 menit (Web Push)
-                                              └─ cleanup harian 03:00 WIB (purge cache Supabase)
+```plantuml
+@startuml arsitektur_papanote
+!theme plain
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam defaultFontName sans-serif
+
+actor "Pengguna / Tim" as User
+
+package "Client Side" {
+  component [Browser / Klien Aktif\n(Svelte 5 Statis SPA)] as Browser
+}
+
+cloud "Supabase Cloud (Free Tier)" as Cloud {
+  database "PostgreSQL\n(Cache, Auth & State)" as SupabaseDB
+  component "Realtime WebSocket" as SupabaseRealtime
+}
+
+node "VPS (yura-infra)" {
+  component [Caddy Web Server\n(file_server dist/)] as Caddy
+  component [papanote-worker\n(Bun Background Sync)] as Worker
+  database "PostgreSQL Internal\n(Source of Truth)" as InternalDB
+}
+
+' Relasi & Alur Data
+User --> Browser : Akses & interaksi UI
+Caddy ..> Browser : Sajikan static bundle (dist/)
+
+Browser --> SupabaseDB : Read / Write data kartu
+SupabaseRealtime --> Browser : Realtime sync ke semua browser aktif
+
+Worker --> SupabaseDB : Pull berkala tiap 1 menit\n(service-role)
+Worker --> InternalDB : Sinkronisasi data\n(Last-Write-Wins)
+Worker --> Browser : Pengingat deadline (Web Push)
+Worker --> SupabaseDB : Cleanup harian 03:00 WIB\n(Purge cache terverifikasi)
+
+@enduml
 ```
 
 - **Frontend 100% Statis:** Disajikan langsung oleh Caddy web server di VPS (`file_server`), tanpa container web server Node/Bun. Sangat cepat, efisien, dan minim memory.
