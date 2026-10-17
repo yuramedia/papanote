@@ -53,7 +53,7 @@ export async function handleSupabaseWebhook(req: Request): Promise<Response> {
 
   if (payload.table === 'card_comments' && payload.type === 'INSERT') {
     const r = payload.record;
-    const authorName = typeof r.user_username === 'string' && r.user_username ? `@${r.user_username}` : 'Seseorang';
+    const authorName = typeof r.user_name === 'string' && r.user_name ? `@${r.user_name}` : 'Seseorang';
     const content = typeof r.content === 'string' ? r.content : '';
     const cardId = typeof r.card_id === 'string' ? r.card_id : '';
     const mentions = Array.isArray(r.mentions) ? (r.mentions as string[]) : [];

@@ -47,7 +47,7 @@ describe.skipIf(!url)('integrasi PostgreSQL internal', () => {
       id: commentId,
       card_id: cardId,
       user_id: '00000000-0000-4000-8000-000000000002',
-      user_username: 'alice',
+      user_name: 'alice',
       user_email: 'alice@example.com',
       content: 'Komentar pertama @bob',
       mentions: ['bob'],
@@ -56,9 +56,9 @@ describe.skipIf(!url)('integrasi PostgreSQL internal', () => {
       updated_at: '2026-10-02T00:00:00Z',
     };
     await upsertRow(sql, 'card_comments', c);
-    const [row] = await sql`SELECT content, user_username FROM card_comments WHERE id = ${commentId}`;
+    const [row] = await sql`SELECT content, user_name FROM card_comments WHERE id = ${commentId}`;
     expect(row.content).toBe('Komentar pertama @bob');
-    expect(row.user_username).toBe('alice');
+    expect(row.user_name).toBe('alice');
   });
 
   test('upsert insert lalu update yang lebih baru', async () => {
