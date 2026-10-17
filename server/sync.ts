@@ -12,6 +12,7 @@ export const SYNC_TABLES = {
     'created_by', 'updated_by', 'deleted_at', 'uploaded_at', 'updated_at',
   ],
   card_histories: ['id', 'card_id', 'old_content', 'changed_by', 'created_at'],
+  card_comments: ['id', 'card_id', 'user_id', 'user_name', 'user_email', 'content', 'reactions', 'created_at', 'updated_at'],
   push_subscriptions: ['endpoint', 'user_id', 'p256dh', 'auth', 'user_agent', 'created_at'],
 } as const;
 
@@ -19,7 +20,7 @@ export type SyncTable = keyof typeof SYNC_TABLES;
 export type Row = Record<string, unknown>;
 
 /** Tabel yang punya updated_at → pakai aturan last-write-wins. card_histories immutable. */
-const VERSIONED: ReadonlySet<SyncTable> = new Set(['boards', 'lists', 'cards']);
+const VERSIONED: ReadonlySet<SyncTable> = new Set(['boards', 'lists', 'cards', 'card_comments']);
 
 export function isSyncTable(t: unknown): t is SyncTable {
   return typeof t === 'string' && Object.hasOwn(SYNC_TABLES, t);

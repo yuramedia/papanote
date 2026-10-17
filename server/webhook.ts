@@ -51,5 +51,28 @@ export async function handleSupabaseWebhook(req: Request): Promise<Response> {
     ).catch((err) => console.warn('[webhook] push gagal:', err));
   }
 
+  if (payload.table === 'card_comments' && payload.type === 'INSERT') {
+    const r = payload.record;
+    const authorName = typeof r.user_username === 'string' && r.user_username ? `@${r.user_username}` : 'Seseorang';
+    const content = typeof r.content === 'string' ? r.content : '';
+    const cardId = typeof r.card_id === 'string' ? r.card_id : '';
+    const mentions = Array.isArray(r.mentions) ? (r.mentions as string[]) : [];
+
+    let bodyText = `${authorName}: ${content.slice(0, 80)}`;
+    if (mentions.length > 0) {
+      bodyText = `${authorName} menyebut ${mentions.map((m) => `@${m}`).join(', ')}: ${content.slice(0, 60)}`;
+    }
+
+    broadcastPush(
+      {
+        title: 'Komentar baru pada kartu',
+        body: bodyText,
+        url: `/#/card/${cardId}`,
+        tag: `card-comment-${cardId}`,
+      },
+      typeof r.user_id === 'string' ? r.user_id : null,
+    ).catch((err) => console.warn('[webhook] push komentar gagal:', err));
+  }
+
   return Response.json({ ok: true });
 }

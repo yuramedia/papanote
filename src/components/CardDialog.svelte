@@ -15,6 +15,7 @@
   import ConfirmDialog from './ConfirmDialog.svelte';
   import BacklinksPanel from './BacklinksPanel.svelte';
   import LocalGraphPanel from './LocalGraphPanel.svelte';
+  import CardComments from './CardComments.svelte';
   import WikilinkPreviewPopover from './WikilinkPreviewPopover.svelte';
   import type { BoardStore } from '../lib/board.svelte';
   import type { Card } from '../lib/types';
@@ -736,6 +737,13 @@
             onnavigate={(targetId) => {
               router.go(`/board/${store.board?.id}/card/${targetId}`);
             }}
+          />
+
+          <!-- Panel Komentar & Diskusi Tim -->
+          <CardComments
+            cardId={card.id}
+            cardTitle={title}
+            boardId={store.board?.id}
           />
         </div>
 

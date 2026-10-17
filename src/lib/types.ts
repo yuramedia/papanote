@@ -48,6 +48,18 @@ export interface CardHistory {
   created_at: string;
 }
 
+export interface CardComment {
+  id: string;
+  card_id: string;
+  user_id: string | null;
+  user_name: string;
+  user_email: string | null;
+  content: string;
+  reactions?: Record<string, string[]>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AppConfig {
   supabaseUrl: string;
   supabaseAnonKey: string;
