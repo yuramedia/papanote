@@ -41,26 +41,6 @@ describe.skipIf(!url)('integrasi PostgreSQL internal', () => {
     expect(rows.map((r: { name: string }) => r.name)).toEqual(['001_internal.sql', '002_card_comments.sql']);
   });
 
-  test('card_comments upsert dan update', async () => {
-    const commentId = '00000000-0000-4000-8000-0000000000c1';
-    const c = {
-      id: commentId,
-      card_id: cardId,
-      user_id: '00000000-0000-4000-8000-000000000002',
-      user_name: 'alice',
-      user_email: 'alice@example.com',
-      content: 'Komentar pertama @bob',
-      mentions: ['bob'],
-      reactions: {},
-      created_at: '2026-10-02T00:00:00Z',
-      updated_at: '2026-10-02T00:00:00Z',
-    };
-    await upsertRow(sql, 'card_comments', c);
-    const [row] = await sql`SELECT content, user_name FROM card_comments WHERE id = ${commentId}`;
-    expect(row.content).toBe('Komentar pertama @bob');
-    expect(row.user_name).toBe('alice');
-  });
-
   test('upsert insert lalu update yang lebih baru', async () => {
     await upsertRow(sql, 'cards', { ...base, updated_at: '2026-10-01T00:00:00Z' });
     await upsertRow(sql, 'cards', { ...base, content: 'v2', updated_at: '2026-10-02T00:00:00Z' });
@@ -81,5 +61,24 @@ describe.skipIf(!url)('integrasi PostgreSQL internal', () => {
     const rows = await sql`SELECT old_content FROM card_histories WHERE card_id = ${cardId}`;
     expect(rows).toHaveLength(1);
     expect(rows[0].old_content).toBe('v1');
+  });
+
+  test('card_comments upsert dan update', async () => {
+    const commentId = '00000000-0000-4000-8000-0000000000c1';
+    const c = {
+      id: commentId,
+      card_id: cardId,
+      user_id: '00000000-0000-4000-8000-000000000002',
+      user_name: 'alice',
+      user_email: 'alice@example.com',
+      content: 'Komentar pertama @bob',
+      reactions: {},
+      created_at: '2026-10-02T00:00:00Z',
+      updated_at: '2026-10-02T00:00:00Z',
+    };
+    await upsertRow(sql, 'card_comments', c);
+    const [row] = await sql`SELECT content, user_name FROM card_comments WHERE id = ${commentId}`;
+    expect(row.content).toBe('Komentar pertama @bob');
+    expect(row.user_name).toBe('alice');
   });
 });
