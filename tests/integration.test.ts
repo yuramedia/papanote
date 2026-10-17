@@ -37,8 +37,28 @@ describe.skipIf(!url)('integrasi PostgreSQL internal', () => {
   };
 
   test('migrasi tercatat sekali', async () => {
-    const rows = await sql`SELECT name FROM _migrations`;
-    expect(rows.map((r: { name: string }) => r.name)).toEqual(['001_internal.sql']);
+    const rows = await sql`SELECT name FROM _migrations ORDER BY name`;
+    expect(rows.map((r: { name: string }) => r.name)).toEqual(['001_internal.sql', '002_card_comments.sql']);
+  });
+
+  test('card_comments upsert dan update', async () => {
+    const commentId = '00000000-0000-4000-8000-0000000000c1';
+    const c = {
+      id: commentId,
+      card_id: cardId,
+      user_id: '00000000-0000-4000-8000-000000000002',
+      user_username: 'alice',
+      user_email: 'alice@example.com',
+      content: 'Komentar pertama @bob',
+      mentions: ['bob'],
+      reactions: {},
+      created_at: '2026-10-02T00:00:00Z',
+      updated_at: '2026-10-02T00:00:00Z',
+    };
+    await upsertRow(sql, 'card_comments', c);
+    const [row] = await sql`SELECT content, user_username FROM card_comments WHERE id = ${commentId}`;
+    expect(row.content).toBe('Komentar pertama @bob');
+    expect(row.user_username).toBe('alice');
   });
 
   test('upsert insert lalu update yang lebih baru', async () => {
