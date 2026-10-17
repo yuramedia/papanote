@@ -18,18 +18,18 @@ flowchart TD
     User(("👤 Pengguna / Tim"))
 
     subgraph Client["🖥️ Client Side"]
-        Browser["Browser / Klien Aktif<br/><b>(Svelte 5 Statis SPA)</b>"]
+        Browser["Browser / Klien Aktif<br/>Svelte 5 Statis SPA"]
     end
 
     subgraph Cloud["☁️ Supabase Cloud (Free Tier)"]
-        SupabaseDB[("PostgreSQL Cache<br/>& State / Auth")]
+        SupabaseDB[("PostgreSQL Cache<br/>State & Auth")]
         SupabaseRealtime["Realtime WebSocket Broadcast"]
     end
 
     subgraph VPS["🏢 VPS (yura-infra)"]
-        Caddy["Caddy Web Server<br/>(file_server dist/)"]
-        Worker["papanote-worker<br/>(Bun Background Sync)"]
-        InternalDB[("PostgreSQL Internal<br/><b>Source of Truth</b>")]
+        Caddy["Caddy Web Server<br/>file_server dist/"]
+        Worker["papanote-worker<br/>Bun Background Sync"]
+        InternalDB[("PostgreSQL Internal<br/>Source of Truth")]
     end
 
     User -->|Akses & Interaksi UI| Browser
@@ -40,7 +40,7 @@ flowchart TD
 
     Worker -->|Pull berkala tiap 1 menit| SupabaseDB
     Worker -->|Sinkronisasi Last-Write-Wins| InternalDB
-    Worker -->|Pengingat deadline (Web Push)| Browser
+    Worker -->|Pengingat deadline Web Push| Browser
     Worker -->|Cleanup harian 03:00 WIB| SupabaseDB
 ```
 
